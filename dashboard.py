@@ -80,11 +80,14 @@ class GradingDashboard:
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
 
+        # Total count of scores and comments
         scores_counts = []
         comments_counts = []
+        comment_wordcounts = []
         for section_id in self.section_ids:
             score_counter = 0
             comment_counter = 0
+            comment_wordcounter = 0
             student_count = 0
             for student_id in self.dict_all[section_id]:
                 student_count += 1
@@ -93,18 +96,22 @@ class GradingDashboard:
                         score_counter += 1
                     if len(submission_data['comment']) > 1:
                         comment_counter += 1
+                        comment_wordcounter += len(submission_data['comment'].split(' '))
             scores_counts.append(round(score_counter/student_count,2))
             comments_counts.append(round(comment_counter/student_count,2))
+            comment_wordcounts.append(round(comment_wordcounter/student_count,2))
 
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
                                                      'Scores per student',
-                                                     'Comments per student']),
+                                                     'Comments per student',
+                                                     'Words of comments per student']),
                                         cells=dict(values=
                                                    [self.section_ids,
                                                     scores_counts,
-                                                    comments_counts]))])
+                                                    comments_counts,
+                                                    comment_wordcounts]))])
 
         self.figures.append('<center><h1>Grading progress</h1></center>')
         
