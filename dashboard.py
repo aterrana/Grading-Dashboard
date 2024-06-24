@@ -18,7 +18,7 @@ class GradingDashboard:
     2. Run all methods corresponding to the graphs and components you want in the report (in the order you want them to appear)
     3. Run create_html to create the .html file of the report
     '''
-    def __init__(self, file_name: str, anonymize: bool = False) -> None:
+    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None) -> None:
         '''
         Sets up global lists and dictionaries
         '''
@@ -38,6 +38,8 @@ class GradingDashboard:
         else:
             # Make it robust to errors here
             ...
+
+        self.target_scorecount = target_scorecount
 
         # Keep track of section ids, average scores, LO names, globally
         self.section_ids = list(dict_all_init.keys())
@@ -101,6 +103,22 @@ class GradingDashboard:
             comments_counts.append(round(comment_counter/student_count,2))
             comment_wordcounts.append(round(comment_wordcounter/student_count,2))
 
+        # Setup colors for score count
+
+        if self.target_scorecount is None:
+            scores_colorscale = ['lightblue']
+            score_color_indices = [0] * len(scores_counts)
+        else:
+            num_colors = 5
+            scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
+            scores_colorscale
+            score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+
+        score_color_indices[0] = 0
+        score_color_indices[1] = 1
+        score_color_indices[2] = 2
+        score_color_indices[3] = 3
+        score_color_indices[4] = 4
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
@@ -111,7 +129,13 @@ class GradingDashboard:
                                                    [self.section_ids,
                                                     scores_counts,
                                                     comments_counts,
-                                                    comment_wordcounts]))])
+                                                    comment_wordcounts],
+                                                    fill_color=[
+                                                        'lightblue',
+                                                        np.array(scores_colorscale)[score_color_indices],
+                                                        'lightblue',
+                                                        'lightblue'
+                                                    ]))])
 
         self.figures.append('<center><h1>Grading progress</h1></center>')
         
@@ -631,7 +655,7 @@ class GradingDashboard:
     
 
 
-gd = GradingDashboard('fake_data_986100.py', anonymize=True)
+gd = GradingDashboard('fake_data_986100.py', anonymize=True, target_scorecount=6)
 
 
 gd.make_full_report()
