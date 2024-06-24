@@ -120,6 +120,11 @@ class GradingDashboard:
         score_color_indices[3] = 3
         score_color_indices[4] = 4
 
+        redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
+
+        comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+        word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
                                                      'Scores per student',
@@ -133,8 +138,8 @@ class GradingDashboard:
                                                     fill_color=[
                                                         'lightblue',
                                                         np.array(scores_colorscale)[score_color_indices],
-                                                        'lightblue',
-                                                        'lightblue'
+                                                        np.array(redblue_colorscale)[comm_count_color_indices],
+                                                        np.array(redblue_colorscale)[word_count_color_indices]
                                                     ]))])
 
         self.figures.append('<center><h1>Grading progress</h1></center>')
