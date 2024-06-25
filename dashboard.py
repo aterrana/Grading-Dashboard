@@ -82,12 +82,6 @@ class GradingDashboard:
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
     
-    def dash_progress_table(self) -> None:
-        df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
-
-
-
-        ...
 
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
