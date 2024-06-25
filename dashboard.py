@@ -155,7 +155,8 @@ class GradingDashboard:
                                                         np.array(scores_colorscale)[score_color_indices],
                                                         np.array(redblue_colorscale)[comm_count_color_indices],
                                                         np.array(redblue_colorscale)[word_count_color_indices]
-                                                    ]))])
+                                                    ],
+                                                    height=30))])
         
         # Make a dataframe of the data, it's more easily sortable
         df = pd.DataFrame(data).T.sort_values(0).T
@@ -174,11 +175,12 @@ class GradingDashboard:
                             method= "restyle",
                             label= selection["name"],
                             args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selection
-                                    "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
                                                         [scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
                                                         [comm_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
                                                         [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
-                                                        ])}},[0]]
+                                                        ]),
+                                                "height": 30}},[0]]
                             )
                             for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by score count", "col_i": 1}, 
@@ -187,7 +189,9 @@ class GradingDashboard:
                     ],
                     direction = "down",
                     y = 1
-                )])
+                )],
+                height=250+35*len(self.section_ids),
+                font_size=15)
         
         self.figures.append('<center><h1>Grading progress</h1></center>')
         
@@ -277,7 +281,8 @@ class GradingDashboard:
                                                         np.array(yellowred_colorscale)[sd_color_indices],
                                                         p_colors,
                                                         np.array(yellowred_colorscale)[effect_color_indices]
-                                                    ]))])
+                                                    ],
+                                                    height=30))])
         
         # Make a dataframe of the data, it's more easily sortable
         df = pd.DataFrame(data).T.sort_values(0).T
@@ -297,12 +302,13 @@ class GradingDashboard:
                             method= "restyle",
                             label= selection["name"],
                             args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selected column
-                                    "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
                                                         [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
                                                         [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
                                                         [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
                                                         [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
-                                                        ])}},[0]]
+                                                        ]), 
+                                                "height": 30}},[0]]
                             )
                             for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by mean", "col_i": 1}, 
@@ -312,7 +318,9 @@ class GradingDashboard:
                     ],
                     direction = "down",
                     y = 1
-                )])
+                )],
+                height=250+35*len(self.section_ids),
+                font_size=15)
 
         self.figures.append('<center><h1>Summary statistics</h1></center>')
         
@@ -675,7 +683,10 @@ class GradingDashboard:
                                         cells=dict(values=[self.section_names, self.section_ids],
                                                     fill_color=[
                                                         self.table_section_colors
-                                                    ]))])
+                                                    ],
+                                                    height=30))])
+        
+        fig.update_layout(height=250+35*len(self.section_ids), font_size=15)
 
         self.figures.append('<center><h1>Section name to ID key</h1></center>')
         
