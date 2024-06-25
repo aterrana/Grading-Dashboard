@@ -136,7 +136,7 @@ class GradingDashboard:
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
         # Collect all columns in one list
-        data = [self.section_ids,
+        data = [self.section_names,
                 scores_counts,
                 comments_counts,
                 comment_wordcounts]
@@ -159,10 +159,10 @@ class GradingDashboard:
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_ids)}
-        scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
-        comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
-        word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
 
 
         # Create sorting drop-down menu
@@ -172,10 +172,10 @@ class GradingDashboard:
                             method= "restyle",
                             label= selection["name"],
                             args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selection
-                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
-                                                        [scores_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [comm_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [word_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
+                                    "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
+                                                        [scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [comm_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
                             for selection in [{"name": "Sort by section ID", "col_i": 0}, 
@@ -264,7 +264,7 @@ class GradingDashboard:
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
         # Create table
-        data = [self.section_ids,
+        data = [self.section_names,
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
                 [round(val,5) for val in p_values],
@@ -291,11 +291,11 @@ class GradingDashboard:
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_ids)}
-        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
-        sd_color_dict = {section_id:yellowred_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
-        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_ids)}
-        effect_color_dict = {section_id:yellowred_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        sd_color_dict = {section_id:yellowred_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_names)}
+        effect_color_dict = {section_id:yellowred_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         
 
         # Create sorting drop-down menu
@@ -305,11 +305,11 @@ class GradingDashboard:
                             method= "restyle",
                             label= selection["name"],
                             args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selected column
-                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
-                                                        [mean_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [sd_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [p_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [effect_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
+                                    "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
+                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
                             for selection in [{"name": "Sort by section ID", "col_i": 0}, 
