@@ -1,4 +1,4 @@
-# Written by Gabriel Nilsson - gabriel.nilsson@uni.minerva.edu
+# Code author: Gabriel Nilsson - gabriel.nilsson@uni.minerva.edu
 
 from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
@@ -8,7 +8,6 @@ import random as rnd
 import numpy as np
 import copy
 
-from dash import Dash, dash_table
 import pandas as pd
 
 class GradingDashboard:
@@ -171,15 +170,15 @@ class GradingDashboard:
             updatemenus=[dict(
                     buttons= [dict(
                             method= "restyle",
-                            label= b["name"],
-                            args= [{"cells": {"values": df.T.sort_values(b["col_i"]).T.values, 
-                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [scores_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [comm_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [word_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]]
+                            label= selection["name"],
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selection
+                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
+                                                        [scores_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [comm_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [word_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
-                            for b in [{"name": "Sort by section ID", "col_i": 0}, 
+                            for selection in [{"name": "Sort by section ID", "col_i": 0}, 
                                       {"name": "Sort by score count", "col_i": 1}, 
                                       {"name": "Sort by comment count", "col_i": 2}, 
                                       {"name": "Sort by word count", "col_i": 3}]
@@ -304,16 +303,16 @@ class GradingDashboard:
             updatemenus=[dict(
                     buttons= [dict(
                             method= "restyle",
-                            label= b["name"],
-                            args= [{"cells": {"values": df.T.sort_values(b["col_i"]).T.values, 
-                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [mean_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [sd_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [p_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
-                                                        [effect_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]]
+                            label= selection["name"],
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selected column
+                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
+                                                        [mean_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [sd_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [p_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+                                                        [effect_color_dict[int(section_id)] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
-                            for b in [{"name": "Sort by section ID", "col_i": 0}, 
+                            for selection in [{"name": "Sort by section ID", "col_i": 0}, 
                                       {"name": "Sort by mean", "col_i": 1}, 
                                       {"name": "Sort by standard deviation", "col_i": 2}, 
                                       {"name": "Sort by p-value", "col_i": 3}, 
@@ -323,12 +322,9 @@ class GradingDashboard:
                     y = 1
                 )])
 
-        fig.show()
-
         self.figures.append('<center><h1>Summary statistics</h1></center>')
         
         self.figures.append(fig)
-
 
 
     def section_avg_scores(self, section_id: int) -> list:
@@ -727,6 +723,22 @@ class GradingDashboard:
 
         print('Dashboard complete')
 
+    def get_sorted_LOs(self) -> list:
+        ''' Returns a list of all graded LOs sorted in descending order according to the number of scores in that LO '''
+        # Count the number of scores for each LO
+        lo_score_counts = []
+        for lo_name in self.all_LOs:
+            score_count = 0
+            for section_id in self.section_ids:
+                for student_id in self.dict_all[section_id]:
+                    for submission_data in self.dict_all[section_id][student_id]:
+                        if submission_data['learning_outcome'] == lo_name:
+                            score_count += 1
+            lo_score_counts.append(score_count)
+
+        # Sort the lo names according to the number of scores
+        return [LO_name for _, LO_name in sorted(zip(lo_score_counts, self.all_LOs), key=lambda pair: pair[0], reverse=True)]
+
 
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
@@ -739,9 +751,10 @@ class GradingDashboard:
         # Skip the violinplots (kde)
         # self.violinplots()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
-        for lo_name in self.all_LOs:
-            # Skip kde LO plots also
-            #self.LO_kde_plot(lo_name)
+
+        sorted_LOs = self.get_sorted_LOs()
+
+        for lo_name in sorted_LOs:
             self.LO_stackedbar_plot(lo_name)
 
         if self.anonymize:
