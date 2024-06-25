@@ -77,6 +77,15 @@ class GradingDashboard:
         
         # Set up the colors for the different sections
         self.section_colors = disc_colors.Dark24[:len(self.section_ids)]
+
+        # set up section colors for the tables
+        # Convert hexadecimal representation to rgb
+        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
+        # Increase brightness with 20%
+        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
+        # Convert to string and set alpha=0.6
+        self.table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
+
         
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
@@ -128,13 +137,6 @@ class GradingDashboard:
         comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
         word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
-        # Convert hexadecimal representation to rgb
-        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
-        # Increase brightness with 20%
-        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
-        # Convert to string and set alpha=0.6
-        table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
-
         # Collect all columns in one list
         data = [self.section_names,
                 scores_counts,
@@ -143,13 +145,13 @@ class GradingDashboard:
         
         # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=
-                                                    ['Section ID', 
+                                                    ['Section name', 
                                                      'Scores per student',
                                                      'Comments per student',
                                                      'Words of comments per student']),
                                         cells=dict(values=data,
                                                     fill_color=[
-                                                        table_section_colors,
+                                                        self.table_section_colors,
                                                         np.array(scores_colorscale)[score_color_indices],
                                                         np.array(redblue_colorscale)[comm_count_color_indices],
                                                         np.array(redblue_colorscale)[word_count_color_indices]
@@ -159,7 +161,7 @@ class GradingDashboard:
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
         scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
@@ -178,7 +180,7 @@ class GradingDashboard:
                                                         [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
-                            for selection in [{"name": "Sort by section ID", "col_i": 0}, 
+                            for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by score count", "col_i": 1}, 
                                       {"name": "Sort by comment count", "col_i": 2}, 
                                       {"name": "Sort by word count", "col_i": 3}]
@@ -255,14 +257,6 @@ class GradingDashboard:
                 # strongly not significant
                 p_colors.append('palegreen')
                 
-        
-        # Convert hexadecimal representation to rgb
-        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
-        # Increase brightness with 20%
-        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
-        # Convert to string and set alpha=0.6
-        table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
-
         # Create table
         data = [self.section_names,
                 [round(val,3) for val in self.section_means],
@@ -271,27 +265,25 @@ class GradingDashboard:
                 [round(val,5) for val in effect_sizes]]
 
         fig = go.Figure(data=[go.Table(header=dict(values=
-                                                    ['Section ID', 
+                                                    ['Section name', 
                                                      'Mean score',
                                                      'Standard Deviation',
                                                      'p-values',
                                                      'effect size']),
                                         cells=dict(values=data,
                                                     fill_color=[
-                                                        table_section_colors,
+                                                        self.table_section_colors,
                                                         np.array(redblue_colorscale)[mean_color_indices],
                                                         np.array(yellowred_colorscale)[sd_color_indices],
                                                         p_colors,
                                                         np.array(yellowred_colorscale)[effect_color_indices]
-                                                    ]),
-                                        hoverinfo='all',
-                                        hoverlabel=dict())])
+                                                    ]))])
         
         # Make a dataframe of the data, it's more easily sortable
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
         mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         sd_color_dict = {section_id:yellowred_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_names)}
@@ -312,7 +304,7 @@ class GradingDashboard:
                                                         [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
                                                         ])}},[0]]
                             )
-                            for selection in [{"name": "Sort by section ID", "col_i": 0}, 
+                            for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by mean", "col_i": 1}, 
                                       {"name": "Sort by standard deviation", "col_i": 2}, 
                                       {"name": "Sort by p-value", "col_i": 3}, 
@@ -677,16 +669,17 @@ class GradingDashboard:
     def section_id_table(self) -> None:
         ''' Add a small table associated anonymous labels of sections to their true section ID '''
 
-        output = ''
-        output += "<center><h3> Anonymized section name <=> Section ID </h3>"
-        for i, section_id in enumerate(self.section_ids):
-            output += "Section " + chr(65+i) + "  <=>  " + str(section_id) + "<br>"
+        fig = go.Figure(data=[go.Table(header=dict(values=
+                                                    ['Section Name', 
+                                                     'Section ID']),
+                                        cells=dict(values=[self.section_names, self.section_ids],
+                                                    fill_color=[
+                                                        self.table_section_colors
+                                                    ]))])
 
-        output += "</center>"
-
-        # Add text to the report
-        self.figures.append(output)
-
+        self.figures.append('<center><h1>Section name to ID key</h1></center>')
+        
+        self.figures.append(fig)
 
     def create_html(self) -> None:
         '''
