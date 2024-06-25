@@ -8,6 +8,9 @@ import random as rnd
 import numpy as np
 import copy
 
+from dash import Dash, dash_table
+import pandas as pd
+
 class GradingDashboard:
     '''
     Class to manage navigation and visualisation of a given grade_data file.
@@ -78,6 +81,13 @@ class GradingDashboard:
         
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
+    
+    def dash_progress_table(self) -> None:
+        df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
+
+
+
+        ...
 
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
@@ -125,6 +135,15 @@ class GradingDashboard:
         comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
         word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
+        print(self.section_colors)
+        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
+        print(table_section_colors)
+        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
+        print(table_section_colors)
+        table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
+        print(table_section_colors)
+
+
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
                                                      'Scores per student',
@@ -136,7 +155,7 @@ class GradingDashboard:
                                                     comments_counts,
                                                     comment_wordcounts],
                                                     fill_color=[
-                                                        'lightblue',
+                                                        table_section_colors,
                                                         np.array(scores_colorscale)[score_color_indices],
                                                         np.array(redblue_colorscale)[comm_count_color_indices],
                                                         np.array(redblue_colorscale)[word_count_color_indices]
@@ -210,6 +229,10 @@ class GradingDashboard:
                 # strongly not significant
                 p_colors.append('palegreen')
                 
+        
+        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
+        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
+        table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
         # Create table
 
@@ -226,7 +249,7 @@ class GradingDashboard:
                                                     [round(val,5) for val in p_values],
                                                     [round(val,5) for val in effect_sizes]],
                                                     fill_color=[
-                                                        'lightblue',
+                                                        table_section_colors,
                                                         np.array(redblue_colorscale)[mean_color_indices],
                                                         np.array(yellowred_colorscale)[sd_color_indices],
                                                         p_colors,
