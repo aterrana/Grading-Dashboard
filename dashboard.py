@@ -92,7 +92,7 @@ class GradingDashboard:
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
 
-        # Total count of scores and comments
+        # Count number of scores and comments
         scores_counts = []
         comments_counts = []
         comment_wordcounts = []
@@ -114,7 +114,6 @@ class GradingDashboard:
             comment_wordcounts.append(round(comment_wordcounter/student_count,2))
 
         # Setup colors for score count
-
         if self.target_scorecount is None:
             scores_colorscale = ['lightblue']
             score_color_indices = [0] * len(scores_counts)
@@ -124,42 +123,74 @@ class GradingDashboard:
             scores_colorscale
             score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
 
-        score_color_indices[0] = 0
-        score_color_indices[1] = 1
-        score_color_indices[2] = 2
-        score_color_indices[3] = 3
-        score_color_indices[4] = 4
+        # Manually set colors in table to display them, remove this later
+        #score_color_indices[0] = 0
+        #score_color_indices[1] = 1
+        #score_color_indices[2] = 2
+        #score_color_indices[3] = 3
+        #score_color_indices[4] = 4
 
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
 
         comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
         word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
-        print(self.section_colors)
+        # Convert hexadecimal representation to rgb
         table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
-        print(table_section_colors)
+        # Increase brightness with 20%
         table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
-        print(table_section_colors)
+        # Convert to string and set alpha=0.6
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
-        print(table_section_colors)
 
-
+        data = [self.section_ids,
+                scores_counts,
+                comments_counts,
+                comment_wordcounts]
+        
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
                                                      'Scores per student',
                                                      'Comments per student',
                                                      'Words of comments per student']),
-                                        cells=dict(values=
-                                                   [self.section_ids,
-                                                    scores_counts,
-                                                    comments_counts,
-                                                    comment_wordcounts],
+                                        cells=dict(values=data,
                                                     fill_color=[
                                                         table_section_colors,
                                                         np.array(scores_colorscale)[score_color_indices],
                                                         np.array(redblue_colorscale)[comm_count_color_indices],
                                                         np.array(redblue_colorscale)[word_count_color_indices]
                                                     ]))])
+        
+        df = pd.DataFrame(data).T.sort_values(0).T
+
+        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_ids)}
+        scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+
+
+        # Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= b["name"],
+                            args= [{"cells": {"values": df.T.sort_values(b["col_i"]).T.values, 
+                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [scores_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [comm_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [word_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]]
+                                                        ])}},[0]]
+                            )
+                            for b in [{"name": "Sort by section ID", "col_i": 0}, 
+                                      {"name": "Sort by score count", "col_i": 1}, 
+                                      {"name": "Sort by comment count", "col_i": 2}, 
+                                      {"name": "Sort by word count", "col_i": 3}]
+                    ],
+                    direction = "down",
+                    y = 1
+                )])
+        
+        fig.show()
 
         self.figures.append('<center><h1>Grading progress</h1></center>')
         
@@ -230,8 +261,11 @@ class GradingDashboard:
                 p_colors.append('palegreen')
                 
         
+        # Convert hexadecimal representation to rgb
         table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
+        # Increase brightness with 20%
         table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
+        # Convert to string and set alpha=0.6
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
         # Create table
@@ -687,36 +721,3 @@ gd = GradingDashboard('fake_data_986100.py', anonymize=True, target_scorecount=6
 
 
 gd.make_full_report()
-
-
-#section_sizes = np.array([19, 20, 19, 19, 19, 16, 16, 12, 17, 18, 17])
-## Calculate section means and SDs
-#section_means = np.array([3.22, 3.33, 3.35, 3.3, 3.33, 3.3, 3.49, 3.14, 3.29, 3.37, 3.27])
-#section_SDs = np.array([0.22, 0.13, 0.14, 0.15, 0.14, 0.17, 0.19, 0.23, 0.12, 0.20, 0.29])
-#
-## Overall average score and SDs, weighted by number of students
-#overall_mean = sum(section_means * section_sizes)/sum(section_sizes)
-#print(overall_mean)
-#overall_SD = sum(section_SDs * section_sizes)/sum(section_sizes)
-#print(overall_SD)
-#average_section_size = np.mean(section_sizes)
-#
-#p_values = []
-#effect_sizes = []
-## Perform two-tailed difference of means test
-#for i in range(len(section_means)):
-#    # Standard error
-#    standard_err = np.sqrt(section_SDs[i]**2 / section_sizes[i] + \
-#                            overall_SD**2 / average_section_size)
-#    
-#    # Effect size, and t-statistic
-#    effect_sizes.append((section_means[i] - overall_mean)/overall_SD)
-#    t_stat = (section_means[i] - overall_mean)/standard_err
-#    
-#    # degrees of freedom
-#    df = min(average_section_size-1, section_sizes[i]-1)
-#
-#    p_values.append(sts.t.sf(abs(t_stat), df) * 2)
-#
-#print(p_values)
-#print(effect_sizes)
