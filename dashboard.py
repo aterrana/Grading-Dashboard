@@ -142,11 +142,13 @@ class GradingDashboard:
         # Convert to string and set alpha=0.6
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
+        # Collect all columns in one list
         data = [self.section_ids,
                 scores_counts,
                 comments_counts,
                 comment_wordcounts]
         
+        # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
                                                      'Scores per student',
@@ -160,8 +162,10 @@ class GradingDashboard:
                                                         np.array(redblue_colorscale)[word_count_color_indices]
                                                     ]))])
         
+        # Make a dataframe of the data, it's more easily sortable
         df = pd.DataFrame(data).T.sort_values(0).T
 
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
         section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_ids)}
         scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
         comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
@@ -190,8 +194,6 @@ class GradingDashboard:
                     y = 1
                 )])
         
-        fig.show()
-
         self.figures.append('<center><h1>Grading progress</h1></center>')
         
         self.figures.append(fig)
@@ -269,6 +271,11 @@ class GradingDashboard:
         table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
         # Create table
+        data = [self.section_ids,
+                [round(val,3) for val in self.section_means],
+                [round(val,3) for val in self.section_SDs],
+                [round(val,5) for val in p_values],
+                [round(val,5) for val in effect_sizes]]
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section ID', 
@@ -276,12 +283,7 @@ class GradingDashboard:
                                                      'Standard Deviation',
                                                      'p-values',
                                                      'effect size']),
-                                        cells=dict(values=
-                                                   [self.section_ids,
-                                                    [round(val,3) for val in self.section_means],
-                                                    [round(val,3) for val in self.section_SDs],
-                                                    [round(val,5) for val in p_values],
-                                                    [round(val,5) for val in effect_sizes]],
+                                        cells=dict(values=data,
                                                     fill_color=[
                                                         table_section_colors,
                                                         np.array(redblue_colorscale)[mean_color_indices],
@@ -291,6 +293,43 @@ class GradingDashboard:
                                                     ]),
                                         hoverinfo='all',
                                         hoverlabel=dict())])
+        
+        # Make a dataframe of the data, it's more easily sortable
+        df = pd.DataFrame(data).T.sort_values(0).T
+
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+        section_color_dict = {section_id:table_section_colors[i] for i, section_id in enumerate(self.section_ids)}
+        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        sd_color_dict = {section_id:yellowred_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_ids)}
+        effect_color_dict = {section_id:yellowred_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_ids)}
+        
+
+        # Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= b["name"],
+                            args= [{"cells": {"values": df.T.sort_values(b["col_i"]).T.values, 
+                                    "fill": dict(color=[[section_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [mean_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [sd_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [p_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]],
+                                                        [effect_color_dict[int(section_id)] for section_id in df.T.sort_values(b["col_i"]).T.values[0]]
+                                                        ])}},[0]]
+                            )
+                            for b in [{"name": "Sort by section ID", "col_i": 0}, 
+                                      {"name": "Sort by mean", "col_i": 1}, 
+                                      {"name": "Sort by standard deviation", "col_i": 2}, 
+                                      {"name": "Sort by p-value", "col_i": 3}, 
+                                      {"name": "Sort by effect size", "col_i": 4}]
+                    ],
+                    direction = "down",
+                    y = 1
+                )])
+
+        fig.show()
 
         self.figures.append('<center><h1>Summary statistics</h1></center>')
         
