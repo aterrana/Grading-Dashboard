@@ -7,6 +7,7 @@ from scipy import stats as sts
 import random as rnd
 import numpy as np
 import copy
+import math
 
 import pandas as pd
 
@@ -60,19 +61,50 @@ class GradingDashboard:
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
         self.section_ids = list(self.dict_all.keys())
 
-        self.all_avgscores = [self.section_avg_scores(section_id) for section_id in self.section_ids]
-
         self.all_scores = []
         self.all_LOs = set()
 
+        self.section_ids_w_scores = copy.deepcopy(self.section_ids)
         for section_id in self.section_ids:
+            # A sublist for this section
             self.all_scores.append([])
             for student_id in self.dict_all[section_id]:
+                # A sublist for this student
+                self.all_scores[-1].append([])
                 for submission_data in self.dict_all[section_id][student_id]:
                     if submission_data['score'] != None:
-                        self.all_scores[-1].append(submission_data['score'])
+                        # Add score for this specific student
+                        self.all_scores[-1][-1].append(submission_data['score'])
                     if submission_data['learning_outcome'] != None:
                         self.all_LOs.add(submission_data['learning_outcome'])
+                # If this student had no scores, omit the list
+                if len(self.all_scores[-1][-1]) == 0:
+                    self.all_scores[-1] = self.all_scores[-1][:-1]
+
+            # If this section had no scores yet, occurs when only comments are exist
+            if len(self.all_scores[-1]) == 0:
+                print("NO SCORES")
+                self.all_scores[-1].append([np.nan])
+                # Keep note of the section ids that actually have scores
+                self.section_ids_w_scores.remove(section_id)
+
+        self.all_avgscores = []
+        for i, section_id in enumerate(self.section_ids):
+            #avg_scores = self.section_avg_scores(section_id_w_scores)
+            # add a sublist for this section
+            self.all_avgscores.append([])
+            if section_id in self.section_ids_w_scores:
+                for student_scores in self.all_scores[i]:
+                    self.all_avgscores[-1].append(np.mean(student_scores))
+            else:
+                self.all_avgscores[-1].append(np.nan)
+            print("This section scores", self.all_scores[i])
+
+        print("all_scores:", self.all_scores)
+        print("all_avgscores:", self.all_avgscores)
+        print("All sections with something", self.section_ids)
+        print("All sections with scores", self.section_ids_w_scores)
+
 
         
         # Set up the colors for the different sections
@@ -103,7 +135,8 @@ class GradingDashboard:
             comment_counter = 0
             comment_wordcounter = 0
             student_count = 0
-            for student_id in self.dict_all[section_id]:
+            print(self.dict_all[section_id].keys())
+            for student_id in self.dict_all[section_id].keys():
                 student_count += 1
                 for submission_data in self.dict_all[section_id][student_id]:
                     if submission_data['score'] is not None:
@@ -134,8 +167,16 @@ class GradingDashboard:
 
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
 
-        comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
-        word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+        # If the max count equals the min count, display the average color for all
+        if max(comments_counts) == min(comments_counts):
+            comm_count_color_indices = [50] * len(comments_counts)
+        else:
+            # Otherwise display the linear change
+            comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+        if max(comment_wordcounts) == min(comment_wordcounts):
+            word_count_color_indices = [50] * len(comment_wordcounts)
+        else:
+            word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
         # Collect all columns in one list
         data = [self.section_names,
@@ -190,7 +231,7 @@ class GradingDashboard:
                     direction = "down",
                     y = 1
                 )],
-                height=250+35*len(self.section_ids),
+                height=250+35*len(self.section_ids) * (1 if self.anonymize else 2),
                 font_size=15)
         
         self.figures.append('<center><h1>Grading progress</h1></center>')
@@ -202,6 +243,9 @@ class GradingDashboard:
         # Calculate section means and SDs
         self.section_means = np.array([np.mean(section_avgs) for section_avgs in self.all_avgscores])
         self.section_SDs = np.array([np.std(section_avgs) if len(section_avgs) > 0 else np.nan for section_avgs in self.all_avgscores])
+
+        print("section means:", self.section_means)
+        print("section SDs:", self.section_SDs)
 
         # Number of students in each section
         self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
@@ -219,7 +263,6 @@ class GradingDashboard:
             # Standard error
             standard_err = np.sqrt(self.section_SDs[i]**2 / self.section_sizes[i] + \
                                    overall_SD**2 / average_section_size)
-            
             # Effect size, and t-statistic
             effect_sizes.append((self.section_means[i] - overall_mean)/overall_SD)
             t_stat = (self.section_means[i] - overall_mean)/standard_err
@@ -235,15 +278,41 @@ class GradingDashboard:
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
         yellowred_colorscale = sample_colorscale('YlOrRd', list(np.linspace(0, 1, 101)))
 
-        # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
-        mean_color_indices = [int(15+70*(val-min(self.section_means))/(max(self.section_means)-min(self.section_means))) for val in self.section_means]
-        # Let SDs vary linearly from 0.0 to 0.7 on yellowred colorscale
-        sd_color_indices = [int(70*(val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))) for val in self.section_SDs]
-        # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
+        # If all means are equal
+        if max(self.section_means)-min(self.section_means) == 0 or np.isnan(max(self.section_means)) or np.isnan(min(self.section_means)):
+            # Set all colors to the middle point
+            mean_color_indices = [50] * len(self.section_means)
+        else:
+            # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
+            mean_color_indices = []
+            for mean_val in self.section_means:
+                if np.isnan(mean_val):
+                    mean_color_indices.append(50)
+                else:
+                    mean_color_indices.append(int(15+70*(mean_val-min(self.section_means))/(max(self.section_means)-min(self.section_means))))
+        # If all SDs are equal
+        if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
+            # Set all colors to the middle point
+            sd_color_indices = [50] * len(self.section_SDs)
+        else:
+            # Let SDs vary linearly from 0.0 to 0.7 on yellowred colorscale
+            sd_color_indices = []
+            for SD_val in self.section_SDs:
+                if np.isnan(SD_val):
+                    sd_color_indices.append(50)
+                else:
+                    sd_color_indices.append(int(70*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
         # precalc the min and max according to absolute value of effect size
         min_abs_effect = min([abs(val) for val in effect_sizes]) 
         max_abs_effect = max([abs(val) for val in effect_sizes])
-        effect_color_indices = [int(70*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
+        
+        # If all effect sizes are equal
+        print("Effect sizes", effect_sizes)
+        if max_abs_effect - min_abs_effect == 0 or np.isnan(effect_sizes).any() or math.isinf(max_abs_effect):
+            effect_color_indices = [50] * len(effect_sizes)
+        else:
+            # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
+            effect_color_indices = [int(70*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
 
         # Manual logic for coloring the p-values
         p_colors = []
@@ -319,7 +388,7 @@ class GradingDashboard:
                     direction = "down",
                     y = 1
                 )],
-                height=250+35*len(self.section_ids),
+                height=250+35*len(self.section_ids) * (1 if self.anonymize else 2),
                 font_size=15)
 
         self.figures.append('<center><h1>Summary statistics</h1></center>')
@@ -340,8 +409,10 @@ class GradingDashboard:
             for score_data in self.dict_all[section_id][this_student_id]:
                 # Excluded None
                 if score_data['score'] != None:
+                    print("Score data:", score_data['score'])
                     student_scores.append(score_data['score'])
-            avg_scores.append(np.mean(student_scores))
+            if len(student_scores) > 0:
+                avg_scores.append(np.mean(student_scores))
 
         return avg_scores
     
@@ -411,27 +482,53 @@ class GradingDashboard:
         else:
             scores = self.all_scores
 
+        print("ANOVA's scores", scores)
+        print("self.all_avgscores", self.all_avgscores)
         # Perform the ANOVA test
-        f_stat, p_value = sts.f_oneway(*scores)
+        try:
+            # Remove all nan from scores
+            filtered_scores = []
+            for sublist in scores:
+                print("sub:", sublist)
+                if not np.isnan(sublist[0][0]):
+                    filtered_scores.append([val for lst in sublist for val in lst])
+            print("filtered scores!:")
+            print(filtered_scores)
 
-        output = ''
-        # Display the results
-        # Small p-value means statistically significant
-        output += "<center><h1> ANOVA Results</h1></center>"
-        output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
-        output += "(With significance level = 0.05)<br>"
-        if p_value < 0.05:
-            output += "We reject the null hypothesis. At least one section has a different mean than the other groups, with statistical significance. There's a" + str(round(p_value*100, 2)) + "% chance of a Type I error.\n\n"
-        else:
-            output += "We don't reject the null hypothesis. We don't have statistically significant evidence that the means of each group aren't the same.\n\n"
-        # F-statistic: Variation between sample means / Variation within samples
-        # Large F-statistic means that there is difference somewhere
-        output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
-        output += "A larger F-statistic means more difference between groups.<br>"
-        output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 2)) + " times larger than the <b>variance within samples</b>."
 
-        # Add text to the report
-        self.figures.append(output)
+            f_stat, p_value = sts.f_oneway(*filtered_scores)
+            #f_stat, p_value = f_stat[0], p_value[0]
+            print("Anova stuff")
+            print(f_stat)
+            print(p_value)
+            if np.isnan(f_stat) or np.isnan(p_value):
+                raise Exception("Not enough data")
+
+            output = ''
+            # Display the results
+            # Small p-value means statistically significant
+            output += "<center><h1> ANOVA Results</h1></center>"
+            output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
+            output += "(With significance level = 0.05)<br>"
+            if p_value < 0.05:
+                output += "We reject the null hypothesis. At least one section has a different mean than the other groups, with statistical significance. There's a " + str(round(p_value*100, 2)) + "% chance of a Type I error.\n\n"
+            else:
+                output += "We don't reject the null hypothesis. We don't have statistically significant evidence that the means of each group aren't the same.\n\n"
+            # F-statistic: Variation between sample means / Variation within samples
+            # Large F-statistic means that there is difference somewhere
+            output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
+            output += "A larger F-statistic means more difference between groups.<br>"
+            output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 2)) + " times larger than the <b>variance within samples</b>."
+
+            # Add text to the report
+            self.figures.append(output)
+        except Exception as e:
+            output = ''
+            output += "<center><h1> ANOVA Results</h1></center>"
+            output += "Couldn't perform ANOVA test because:<br>" + str(e)
+            self.figures.append(output)
+
+        
 
 
     def boxplots(self, averages=True) -> None:
@@ -764,10 +861,72 @@ class GradingDashboard:
         if self.anonymize:
             self.section_id_table()
         self.create_html()
-    
 
 
-gd = GradingDashboard('fake_data_986100.py', anonymize=True, target_scorecount=6)
+import json
+# Create new file with only portions of fake_data
+def create_data(file_name:str, total_scores:int):
+
+    # Read in data
+
+    # Open the file
+    with open(file_name, 'r', encoding='utf8') as file:
+        data = file.read()
+
+    # Dangerous eval call, should test for errors
+    try:
+        dict_all = eval(data)
+    except:
+        raise Exception("text in file not properly formatted dictionary")
+
+    # Edit data in dict variable
+    all_scores_path = []
+
+    # Get all score paths
+    for section_ID in dict_all.keys():
+        for student_ID in dict_all[section_ID].keys():
+            for score_index in range(len(dict_all[section_ID][student_ID])):
+                all_scores_path.append((section_ID, student_ID, score_index))
+        
+    rnd.seed(10)
+    chosen_scores = rnd.sample(all_scores_path, total_scores)
+    #print(chosen_scores)
+    new_dict = {}
+
+    for score_path in chosen_scores:
+        if score_path[0] in new_dict.keys():
+            if score_path[1] in new_dict[score_path[0]].keys():
+                # Add the score data to the list, if the list already exists
+                new_dict[score_path[0]][score_path[1]].append(dict_all[score_path[0]][score_path[1]][score_path[2]])
+            else:
+                # This student doesn't exist yet, add it with a list containing the score data
+                new_dict[score_path[0]][score_path[1]] = [dict_all[score_path[0]][score_path[1]][score_path[2]]]
+        else:
+            # This section doesn't exist yet, add it with the correct student and data list
+            new_dict[score_path[0]] = {score_path[1]: [dict_all[score_path[0]][score_path[1]][score_path[2]]]}
+
+        
+    #print(new_dict)
+
+
+    # Write dictionary into new file
+    new_file_name = 'fake_data_new.py'
+
+    with open(new_file_name, 'w', encoding='utf8') as file:
+        file.write(str(new_dict))
+        
+
+    # Copy the old data
+    # shutil.copyfile(file_name, new_file_name)
+
+    return new_file_name
+
+# ANOVA tests says there's significance at 190, rnd.seed(10), feels weird
+new_data_name = create_data('fake_data_986100.py', 100)
+gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
 
 
 gd.make_full_report()
+
+import os
+os.system("start file:///C:/Users/gabri/Desktop/Grading%20Dashboard/grading_dashboard.html")
