@@ -165,18 +165,18 @@ class GradingDashboard:
         #score_color_indices[3] = 3
         #score_color_indices[4] = 4
 
-        redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
+        redblue_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
 
         # If the max count equals the min count, display the average color for all
         if max(comments_counts) == min(comments_counts):
-            comm_count_color_indices = [50] * len(comments_counts)
+            comm_count_color_indices = [0] * len(comments_counts)
         else:
             # Otherwise display the linear change
-            comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+            comm_count_color_indices = [int(60*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
         if max(comment_wordcounts) == min(comment_wordcounts):
-            word_count_color_indices = [50] * len(comment_wordcounts)
+            word_count_color_indices = [0] * len(comment_wordcounts)
         else:
-            word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+            word_count_color_indices = [int(60*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
         # Collect all columns in one list
         data = [self.section_names,
@@ -190,6 +190,119 @@ class GradingDashboard:
                                                      'Scores per student',
                                                      'Comments per student',
                                                      'Words of comments per student']),
+                                        cells=dict(values=data,
+                                                    fill_color=[
+                                                        self.table_section_colors,
+                                                        np.array(scores_colorscale)[score_color_indices],
+                                                        np.array(redblue_colorscale)[comm_count_color_indices],
+                                                        np.array(redblue_colorscale)[word_count_color_indices]
+                                                    ],
+                                                    height=30))])
+        
+        # Make a dataframe of the data, it's more easily sortable
+        df = pd.DataFrame(data).T.sort_values(0).T
+
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+
+
+        # Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= selection["name"],
+                                                                                            # Sort ascending only for column 0
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values, # Sort all values according to selection
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                        [scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [comm_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]]
+                                                        ]),
+                                                "height": 30}},[0]]
+                            )
+                            for selection in [{"name": "Sort by section name", "col_i": 0}, 
+                                      {"name": "Sort by score count", "col_i": 1}, 
+                                      {"name": "Sort by comment count", "col_i": 2}, 
+                                      {"name": "Sort by word count", "col_i": 3}]
+                    ],
+                    direction = "down",
+                    y = 1
+                )],
+                height=250+35*len(self.section_ids) * (1 if self.anonymize else 2),
+                font_size=15)
+        
+        self.figures.append('<center><h1>Grading progress</h1></center>')
+        
+        self.figures.append(fig)
+
+    def LO_progress_table(self) -> None:
+        ''' Produces table with progress indication, adds it to report '''
+
+        # Count number of scores and comments
+        scores_counts = []
+        comments_counts = []
+        comment_wordcounts = []
+        for section_id in self.section_ids:
+            score_counter = 0
+            comment_counter = 0
+            comment_wordcounter = 0
+            student_count = 0
+            print(self.dict_all[section_id].keys())
+            for student_id in self.dict_all[section_id].keys():
+                student_count += 1
+                for submission_data in self.dict_all[section_id][student_id]:
+                    if submission_data['score'] is not None:
+                        score_counter += 1
+                    if len(submission_data['comment']) > 1:
+                        comment_counter += 1
+                        comment_wordcounter += len(submission_data['comment'].split(' '))
+            scores_counts.append(round(score_counter/student_count,2))
+            comments_counts.append(round(comment_counter/student_count,2))
+            comment_wordcounts.append(round(comment_wordcounter/student_count,2))
+
+        # Setup colors for score count
+        if self.target_scorecount is None:
+            scores_colorscale = ['lightblue']
+            score_color_indices = [0] * len(scores_counts)
+        else:
+            num_colors = 5
+            scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
+            scores_colorscale
+            score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+
+        # Manually set colors in table to display them, remove this later
+        #score_color_indices[0] = 0
+        #score_color_indices[1] = 1
+        #score_color_indices[2] = 2
+        #score_color_indices[3] = 3
+        #score_color_indices[4] = 4
+
+        redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
+
+        # If the max count equals the min count, display the average color for all
+        if max(comments_counts) == min(comments_counts):
+            comm_count_color_indices = [50] * len(comments_counts)
+        else:
+            # Otherwise display the linear change
+            comm_count_color_indices = [int(15+70*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+        if max(comment_wordcounts) == min(comment_wordcounts):
+            word_count_color_indices = [50] * len(comment_wordcounts)
+        else:
+            word_count_color_indices = [int(15+70*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+        
+        # Collect all columns in one list
+        data = [self.section_names,
+                scores_counts,
+                comments_counts,
+                comment_wordcounts]
+        
+        # Create table figure, with appropriate colors
+        fig = go.Figure(data=[go.Table(header=dict(values=
+                                                    ['Section name'].extend(self.all_LOs)),
                                         cells=dict(values=data,
                                                     fill_color=[
                                                         self.table_section_colors,
@@ -276,7 +389,7 @@ class GradingDashboard:
 
         # Create colorscales
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
-        yellowred_colorscale = sample_colorscale('YlOrRd', list(np.linspace(0, 1, 101)))
+        greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
 
         # If all means are equal
         if max(self.section_means)-min(self.section_means) == 0 or np.isnan(max(self.section_means)) or np.isnan(min(self.section_means)):
@@ -299,9 +412,9 @@ class GradingDashboard:
             sd_color_indices = []
             for SD_val in self.section_SDs:
                 if np.isnan(SD_val):
-                    sd_color_indices.append(50)
+                    sd_color_indices.append(0)
                 else:
-                    sd_color_indices.append(int(70*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
+                    sd_color_indices.append(int(50*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
         # precalc the min and max according to absolute value of effect size
         min_abs_effect = min([abs(val) for val in effect_sizes]) 
         max_abs_effect = max([abs(val) for val in effect_sizes])
@@ -309,10 +422,10 @@ class GradingDashboard:
         # If all effect sizes are equal
         print("Effect sizes", effect_sizes)
         if max_abs_effect - min_abs_effect == 0 or np.isnan(effect_sizes).any() or math.isinf(max_abs_effect):
-            effect_color_indices = [50] * len(effect_sizes)
+            effect_color_indices = [0] * len(effect_sizes)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
-            effect_color_indices = [int(70*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
+            effect_color_indices = [int(50*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
 
         # Manual logic for coloring the p-values
         p_colors = []
@@ -320,15 +433,19 @@ class GradingDashboard:
             if val < 0.05: #0.05
                 # significant
                 p_colors.append('red')
-            elif val < 0.1: #0.1
-                # close to significant
-                p_colors.append('orange')
-            elif val < 0.3: #0.3
-                # not strongly non-significant
-                p_colors.append('mistyrose') 
             else:
-                # strongly not significant
-                p_colors.append('palegreen')
+                # Not significant
+                p_colors.append('white') 
+
+            #elif val < 0.1: #0.1
+            #    # close to significant
+            #    p_colors.append('orange')
+            #elif val < 0.3: #0.3
+            #    # not strongly non-significant
+            #    p_colors.append('mistyrose') 
+            #else:
+            #    # strongly not significant
+            #    p_colors.append('palegreen')
                 
         # Create table
         data = [self.section_names,
@@ -347,9 +464,9 @@ class GradingDashboard:
                                                     fill_color=[
                                                         self.table_section_colors,
                                                         np.array(redblue_colorscale)[mean_color_indices],
-                                                        np.array(yellowred_colorscale)[sd_color_indices],
+                                                        np.array(greys_colorscale)[sd_color_indices],
                                                         p_colors,
-                                                        np.array(yellowred_colorscale)[effect_color_indices]
+                                                        np.array(greys_colorscale)[effect_color_indices]
                                                     ],
                                                     height=30))])
         
@@ -359,9 +476,9 @@ class GradingDashboard:
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
         section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
         mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_names)}
-        sd_color_dict = {section_id:yellowred_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_names)}
-        effect_color_dict = {section_id:yellowred_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         
 
         # Create sorting drop-down menu
@@ -370,12 +487,13 @@ class GradingDashboard:
                     buttons= [dict(
                             method= "restyle",
                             label= selection["name"],
-                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selected column
-                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure colors are with correct cell
-                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
+                                                                                            # Sort ascending only for column 0 and 3
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values, # Sort all values according to selected column
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]], # Ensure colors are with correct cell
+                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
+                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
+                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
+                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]]
                                                         ]), 
                                                 "height": 30}},[0]]
                             )
