@@ -416,6 +416,7 @@ class GradingDashboard:
 
         return avg_scores
     
+    # Not used currently
     def section_scoreavgs_plot(self, section_id: int, bin_size:int=0.2) -> None:
         ''' Creates plot that shows the distribution of average scores, for given section'''
 
@@ -439,8 +440,8 @@ class GradingDashboard:
         
         # Add plot to the report
         self.figures.append(fig)
-
-
+    
+    # Not used currently
     def scoreavgs_allsections_plot(self, bin_size:int=0.2) -> None:
         ''' Creates plot that shows overlaying histograms of student scores for each section '''
 
@@ -518,7 +519,7 @@ class GradingDashboard:
             # Large F-statistic means that there is difference somewhere
             output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
             output += "A larger F-statistic means more difference between groups.<br>"
-            output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 2)) + " times larger than the <b>variance within samples</b>."
+            output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 3)) + " times larger than the <b>variance within samples</b>."
 
             # Add text to the report
             self.figures.append(output)
@@ -527,8 +528,6 @@ class GradingDashboard:
             output += "<center><h1> ANOVA Results</h1></center>"
             output += "Couldn't perform ANOVA test because:<br>" + str(e)
             self.figures.append(output)
-
-        
 
 
     def boxplots(self, averages=True) -> None:
@@ -654,7 +653,7 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
-
+    # Not used currently
     def violinplots(self, averages=True) -> None:
         ''' Creates side by side violinplots '''
 
@@ -679,7 +678,7 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
-
+    # Not used currently
     def LO_kde_plot(self, LO_name:str) -> None:
         ''' Creates side by side kde plots with mean, displaying general grade distribution per section '''
         
@@ -729,19 +728,20 @@ class GradingDashboard:
         ''' Create stacked barplot with percentages '''
         
         # Find scores of this LO in each section
-        LO_scores_perc = []
+        LO_scores_count = []
 
         for section_id in self.section_ids:
             # Add 5 counters for the 5 possible scores
-            LO_scores_perc.append(np.zeros(5))
+            LO_scores_count.append(np.zeros(5))
             for student_id in self.dict_all[section_id]:
                 for submission_data in self.dict_all[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
-                        LO_scores_perc[-1][int(submission_data['score'])-1] += 1
+                        LO_scores_count[-1][int(submission_data['score'])-1] += 1
         
+        LO_scores_perc = [np.zeros(5) for _ in range(len(self.section_ids))]
         # If there are any scores, convert counts to percentages [0-1]
-        for i, section in enumerate(LO_scores_perc):
+        for i, section in enumerate(LO_scores_count):
             if sum(section) > 0:
                 LO_scores_perc[i] = np.array(section)/sum(section)
 
@@ -754,7 +754,7 @@ class GradingDashboard:
                                  x=self.section_names, 
                                  y=score_fractions, 
                                  marker=dict(color=colors[score-1]),
-                                 text=[str(round(val*100, 1)) + '%' for val in score_fractions],
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
                                  textposition='inside'))
             
         # Change the bar mode to stack
@@ -905,10 +905,6 @@ def create_data(file_name:str, total_scores:int):
             # This section doesn't exist yet, add it with the correct student and data list
             new_dict[score_path[0]] = {score_path[1]: [dict_all[score_path[0]][score_path[1]][score_path[2]]]}
 
-        
-    #print(new_dict)
-
-
     # Write dictionary into new file
     new_file_name = 'fake_data_new.py'
 
@@ -916,13 +912,9 @@ def create_data(file_name:str, total_scores:int):
         file.write(str(new_dict))
         
 
-    # Copy the old data
-    # shutil.copyfile(file_name, new_file_name)
-
     return new_file_name
 
-# ANOVA tests says there's significance at 190, rnd.seed(10), feels weird
-new_data_name = create_data('fake_data_986100.py', 100)
+new_data_name = create_data('fake_data_986100.py', 190)
 gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
 
 
