@@ -573,27 +573,26 @@ class GradingDashboard:
     def scoreavgs_allsections_plot(self, bin_size:int=0.2) -> None:
         ''' Creates plot that shows a single histogram of student scores distribution '''
 
-        # For each section
-        print("\n\n\n\n\n all avgscores", self.all_avgscores)
+        # Flatten the list of scores
         all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
         
+        # Make histogram
         fig = go.Figure(data=go.Histogram(
                     x=all_scores_flat,
                     xbins=dict(
                         start=0,
                         end=5,
-                        size=bin_size
-                    ),
-                    opacity=0.8))
-        # Make histogram
+                        size=bin_size),
+                    opacity=0.8,
+                    showlegend=False))
         
+        fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
         
         fig.update_traces(marker_line_width=1,marker_line_color="white")
         fig.update_layout(
-            title=f'Score distribution across all sections ({len(gd.section_ids)} sections)',
+            title=f'Score distribution across all sections ({len(self.section_ids)} sections)',
             xaxis_title='Score',
-            yaxis_title='Count',
-            barmode='overlay')
+            yaxis_title='Count')
         
         # Add plot to the report
         self.figures.append(fig)
