@@ -169,14 +169,14 @@ class GradingDashboard:
 
         # If the max count equals the min count, display the average color for all
         if max(comments_counts) == min(comments_counts):
-            comm_count_color_indices = [0] * len(comments_counts)
+            comm_count_color_indices = [10] * len(comments_counts)
         else:
             # Otherwise display the linear change
-            comm_count_color_indices = [int(60*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+            comm_count_color_indices = [int(10+40*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
         if max(comment_wordcounts) == min(comment_wordcounts):
-            word_count_color_indices = [0] * len(comment_wordcounts)
+            word_count_color_indices = [10] * len(comment_wordcounts)
         else:
-            word_count_color_indices = [int(60*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+            word_count_color_indices = [int(10+40*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
 
         # Collect all columns in one list
         data = [self.section_names,
@@ -227,15 +227,17 @@ class GradingDashboard:
                             for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by score count", "col_i": 1}, 
                                       {"name": "Sort by comment count", "col_i": 2}, 
-                                      {"name": "Sort by word count", "col_i": 3}]
+                                      {"name": "Sort by wordcount", "col_i": 3}]
                     ],
                     direction = "down",
-                    y = 1
+                    y = 1.15,
+                    x = 1
                 )],
                 height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
         
         self.figures.append('<center><h1>Grading progress</h1></center>')
+        self.figures.append("<i>The key associating each section ('Section C') with it's Forum section ID ('16193482') is found at the bottom of the report</i>")
         
         self.figures.append(fig)
 
@@ -281,10 +283,10 @@ class GradingDashboard:
 
         tot_lo_color_indices = []
         if max(total_scores_given) == min(total_scores_given):
-            tot_lo_color_indices = [25] * len(self.section_ids)
+            tot_lo_color_indices = [10] * len(self.section_ids)
         else:
             # Otherwise display the linear change
-            tot_lo_color_indices = [int(50*(val-min(tot_lo_color_indices))/(max(tot_lo_color_indices)-min(tot_lo_color_indices))) for val in tot_lo_color_indices]
+            tot_lo_color_indices = [int(10+40*(val-min(total_scores_given))/(max(total_scores_given)-min(total_scores_given))) for val in total_scores_given]
         print("lo_color_indices: ", lo_color_indices)
         # Collect all columns in one list
         data = [self.section_names, total_scores_given]
@@ -293,13 +295,20 @@ class GradingDashboard:
         column_names = ['Section name', 'Total scores assigned']
         column_names.extend(['Score count in ' + lo_name for lo_name in self.all_LOs])
         
-        column_colors = [self.table_section_colors]
-        column_colors.extend(np.array(greys_colorscale)[tot_lo_color_indices])
+        column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
+        tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
+        print(tot_lo_color_indices)
+        print(tot_lo_colors)
+        print(len(column_colors))
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.all_LOs))])
+        print(len(column_colors))
 
         print("\n\n\n\n\n\n\n\n")
         print("values:", ['Section name'].extend(self.all_LOs))
         print("data:", data)
+        print("column colors:")
+        for color_lst in column_colors:
+            print(color_lst)
         
         # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=column_names),
@@ -312,12 +321,21 @@ class GradingDashboard:
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
         #section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        #total_scores_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
+        #print("column colors length:")
+        #print(len(column_colors))
+        #for color_lst in column_colors:
+        #    print(color_lst)
+        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
         #scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         #comm_color_dict = {section_id:greys_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
         #word_color_dict = {section_id:greys_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
 
 
-        # Create sorting drop-down menu
+        #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
+        #                  {"name": "Sort by total scores", "col_i": 1}]
+        #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
+        ## Create sorting drop-down menu
         fig.update_layout(
         #    updatemenus=[dict(
         #            buttons= [dict(
@@ -325,24 +343,22 @@ class GradingDashboard:
         #                    label= selection["name"],
         #                    args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selection
         #                                        "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
-        #                                                [scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-        #                                                [comm_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-        #                                                [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]]
+        #                                                [total_scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
+        #                                                *[[score_count_color_dicts[lo_index][section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]] for lo_index in self.all_LOs]
         #                                                ]),
         #                                        "height": 30}},[0]]
         #                    )
-        #                    for selection in [{"name": "Sort by section name", "col_i": 0}, 
-        #                              {"name": "Sort by score count", "col_i": 1}, 
-        #                              {"name": "Sort by comment count", "col_i": 2}, 
-        #                              {"name": "Sort by word count", "col_i": 3}]
+        #                    for selection in menu_selection
         #            ],
         #            direction = "down",
-        #            y = 1
+        #            y = 1.15,
+        #            x = 1
         #        )],
-                height=250+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
         
-        self.figures.append('<center><h1>LO progress</h1></center>')
+        self.figures.append('<center><h1>LO grading progress</h1></center>')
+        self.figures.append('<center><i>work in progress, this table will be prettier</i></center>')
         
         self.figures.append(fig)
 
@@ -401,7 +417,7 @@ class GradingDashboard:
         # If all SDs are equal
         if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
             # Set all colors to the middle point
-            sd_color_indices = [50] * len(self.section_SDs)
+            sd_color_indices = [10] * len(self.section_SDs)
         else:
             # Let SDs vary linearly from 0.0 to 0.7 on yellowred colorscale
             sd_color_indices = []
@@ -409,7 +425,7 @@ class GradingDashboard:
                 if np.isnan(SD_val):
                     sd_color_indices.append(0)
                 else:
-                    sd_color_indices.append(int(50*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
+                    sd_color_indices.append(int(10+40*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
         # precalc the min and max according to absolute value of effect size
         min_abs_effect = min([abs(val) for val in effect_sizes]) 
         max_abs_effect = max([abs(val) for val in effect_sizes])
@@ -417,10 +433,10 @@ class GradingDashboard:
         # If all effect sizes are equal
         print("Effect sizes", effect_sizes)
         if max_abs_effect - min_abs_effect == 0 or np.isnan(effect_sizes).any() or math.isinf(max_abs_effect):
-            effect_color_indices = [0] * len(effect_sizes)
+            effect_color_indices = [10] * len(effect_sizes)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
-            effect_color_indices = [int(50*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
+            effect_color_indices = [int(10+40*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
 
         # Manual logic for coloring the p-values
         p_colors = []
@@ -499,15 +515,16 @@ class GradingDashboard:
                                       {"name": "Sort by effect size", "col_i": 4}]
                     ],
                     direction = "down",
-                    y = 1
+                    y = 1.15,
+                    x = 1
                 )],
                 height=250+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
 
         self.figures.append('<center><h1>Summary statistics</h1></center>')
+        self.figures.append('p-values and effect size are from a difference of means test, <br>comparing each section with the "average" section. <br>This calculation is currently quite basic and will be improved.')
         
         self.figures.append(fig)
-
 
     def section_avg_scores(self, section_id: int) -> list:
         ''' Returns a list with the average score of each student for this section '''
@@ -522,7 +539,6 @@ class GradingDashboard:
             for score_data in self.dict_all[section_id][this_student_id]:
                 # Excluded None
                 if score_data['score'] != None:
-                    print("Score data:", score_data['score'])
                     student_scores.append(score_data['score'])
             if len(student_scores) > 0:
                 avg_scores.append(np.mean(student_scores))
@@ -554,26 +570,23 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
     
-    # Not used currently
     def scoreavgs_allsections_plot(self, bin_size:int=0.2) -> None:
-        ''' Creates plot that shows overlaying histograms of student scores for each section '''
+        ''' Creates plot that shows a single histogram of student scores distribution '''
 
         # For each section
-        histograms = []
-        for i, section_id in enumerate(gd.section_ids):
-            
-            # Make histogram
-            histograms.append(go.Histogram(
-                        x=self.section_avg_scores(section_id),
-                        xbins=dict(
-                            start=0,
-                            end=5,
-                            size=bin_size
-                        ),
-                        opacity=0.3,
-                        name=f'Section {chr(i+65)}'))
-            
-        fig = go.Figure(data=histograms)
+        print("\n\n\n\n\n all avgscores", self.all_avgscores)
+        all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
+        
+        fig = go.Figure(data=go.Histogram(
+                    x=all_scores_flat,
+                    xbins=dict(
+                        start=0,
+                        end=5,
+                        size=bin_size
+                    ),
+                    opacity=0.8))
+        # Make histogram
+        
         
         fig.update_traces(marker_line_width=1,marker_line_color="white")
         fig.update_layout(
@@ -749,7 +762,7 @@ class GradingDashboard:
 
 
         fig.update_layout(
-            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplot is quartiles, black lines are mean +- 1 SD',
+            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplots are quartiles, black lines are mean +- 1 SD',
             xaxis_title='Section',
             yaxis_title='Scores',
             height=800,
@@ -961,7 +974,10 @@ class GradingDashboard:
         self.progress_table()
         self.LO_progress_table()
         self.summary_stats_table()
+        self.scoreavgs_allsections_plot()
         self.figures.append("<center><h1>Student average score distributions</h1></center>")
+        self.figures.append("- Click and drag inside the plot to zoom in, double click to reset<br>")
+        self.figures.append("- Click the legend on the right to select and deselect different sections")
         self.boxplots()
         # Skip the violinplots (kde)
         # self.violinplots()
@@ -1027,8 +1043,8 @@ def create_data(file_name:str, total_scores:int):
 
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 190)
-gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
+new_data_name = create_data('fake_data_986100.py', 28)
+gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6)
 
 
 gd.make_full_report()
