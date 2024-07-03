@@ -119,7 +119,8 @@ class GradingDashboard:
         # Convert to string and set alpha=0.6
         self.table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
 
-        
+        self.sorted_LOs = self.get_sorted_LOs()
+
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
     
@@ -460,11 +461,25 @@ class GradingDashboard:
             #    p_colors.append('palegreen')
                 
         # Create table
-        data = [self.section_names,
+        
+        data = [self.section_names[:],
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
                 [round(val,5) for val in p_values],
                 [round(val,5) for val in effect_sizes]]
+        
+        data[0].append('Average')
+        this_table_section_colors = self.table_section_colors[:]
+        this_table_section_colors.append('white')
+        data[1].append(round(np.mean(self.section_means), 3))
+        mean_color_indices.append(50)
+        data[2].append(round(np.mean(self.section_SDs), 3))
+        sd_color_indices.append(0)
+        data[3].append(np.nan)
+        p_colors.append('white')
+        data[4].append(np.nan)
+        effect_color_indices.append(0)
+        print(self.section_names)
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section name', 
@@ -474,7 +489,7 @@ class GradingDashboard:
                                                      'effect size']),
                                         cells=dict(values=data,
                                                     fill_color=[
-                                                        self.table_section_colors,
+                                                        this_table_section_colors,
                                                         np.array(redblue_colorscale)[mean_color_indices],
                                                         np.array(greys_colorscale)[sd_color_indices],
                                                         p_colors,
@@ -486,11 +501,11 @@ class GradingDashboard:
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
-        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(self.section_names)}
-        sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(self.section_names)}
-        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(self.section_names)}
-        effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        section_color_dict = {section_id:this_table_section_colors[i] for i, section_id in enumerate(data[0])}
+        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(data[0])}
+        sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(data[0])}
+        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(data[0])}
+        effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
         
 
         # Create sorting drop-down menu
@@ -519,7 +534,7 @@ class GradingDashboard:
                     y = 1.15,
                     x = 1
                 )],
-                height=250+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=450+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
 
         self.figures.append('<center><h1>Summary statistics</h1></center>')
@@ -894,7 +909,7 @@ class GradingDashboard:
             
         # Change the bar mode to stack
         fig.update_layout(
-            title=f'<b>Percentage of students receiving score in {LO_name} per section</b><br>Stacked barplots.',
+            title=f'<b>Score distribution for {LO_name} per section</b><br>Stacked barplots.',
             xaxis_title='Section',
             yaxis_title='Percentage',
             height=800,
@@ -905,6 +920,52 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
         
+    def LO_stackedbar_plot_all(self) -> None:
+        ''' Create stacked barplot with percentages '''
+        
+        # Find scores of this LO in each section
+        LO_scores_count = []
+
+        for LO_name in self.sorted_LOs:
+            LO_scores_count.append(np.zeros(5))
+            for section_id in self.section_ids:
+                # Add 5 counters for the 5 possible scores
+                for student_id in self.dict_all[section_id]:
+                    for submission_data in self.dict_all[section_id][student_id]:
+                        if submission_data['learning_outcome'] == LO_name:
+                            # Increment the the counter corresponding to the score
+                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+            
+        LO_scores_perc = [np.zeros(5) for _ in range(len(self.all_LOs))]
+        # If there are any scores, convert counts to percentages [0-1]
+        for i, this_lo_dist in enumerate(LO_scores_count):
+            if sum(this_lo_dist) > 0:
+                LO_scores_perc[i] = np.array(this_lo_dist)/sum(this_lo_dist)
+
+        # The official minerva grade colors, from left to right, 1 to 5
+        colors = ['rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+        fig = go.Figure()
+        for score in range(1, 6):
+            score_fractions = [section_scores[score-1] for section_scores in LO_scores_perc]
+            fig.add_trace(go.Bar(name=score,
+                                 x=list(self.sorted_LOs), 
+                                 y=score_fractions, 
+                                 marker=dict(color=colors[score-1]),
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
+                                 textposition='inside'))
+            
+        # Change the bar mode to stack
+        fig.update_layout(
+            title=f'<b>Score distribution per LO</b><br>Stacked barplots.',
+            xaxis_title='Section',
+            yaxis_title='Percentage',
+            height=800,
+            barmode='stack')
+        
+        fig.layout.yaxis.tickformat = '0%'
+
+        # Add plot to the report
+        self.figures.append(fig)
 
     def section_id_table(self) -> None:
         ''' Add a small table associated anonymous labels of sections to their true section ID '''
@@ -983,8 +1044,8 @@ class GradingDashboard:
         self.progress_table()
         self.LO_progress_table()
         self.summary_stats_table()
-        self.scoreavgs_allsections_plot()
         self.figures.append("<center><h1>Student average score distributions</h1></center>")
+        self.scoreavgs_allsections_plot()
         self.figures.append("- Click and drag inside the plot to zoom in, double click to reset<br>")
         self.figures.append("- Click the legend on the right to select and deselect different sections")
         self.boxplots()
@@ -992,9 +1053,8 @@ class GradingDashboard:
         # self.violinplots()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
-        sorted_LOs = self.get_sorted_LOs()
-
-        for lo_name in sorted_LOs:
+        self.LO_stackedbar_plot_all()
+        for lo_name in self.sorted_LOs:
             self.LO_stackedbar_plot(lo_name)
 
         self.section_id_table()
