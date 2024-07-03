@@ -2,6 +2,7 @@
 
 from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
+import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats as sts
 import random as rnd
@@ -577,14 +578,23 @@ class GradingDashboard:
         all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
         
         # Make histogram
-        fig = go.Figure(data=go.Histogram(
-                    x=all_scores_flat,
-                    xbins=dict(
-                        start=0,
-                        end=5,
-                        size=bin_size),
+        
+        
+        fig = px.histogram(x=all_scores_flat,
                     opacity=0.8,
-                    showlegend=False))
+                    marginal="rug",
+                    text_auto=True,
+                    nbins=int(10))
+        
+        #fig = go.Figure(data=go.Histogram(
+        #            x=all_scores_flat,
+        #            xbins=dict(
+        #                start=0,
+        #                end=5,
+        #                size=bin_size),
+        #            opacity=0.8,
+        #            showlegend=False,
+        #            text=['a','b','c']))
         
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
         
