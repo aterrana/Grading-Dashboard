@@ -247,8 +247,8 @@ class GradingDashboard:
         ''' Produces table with progress indication, adds it to report '''
 
         # Count number of scores and comments
-        lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.all_LOs))]
-        for lo_index, lo_name in enumerate(self.all_LOs):
+        lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.sorted_LOs))]
+        for lo_index, lo_name in enumerate(self.sorted_LOs):
             for section_index, section_id in enumerate(self.section_ids):
                 for student_id in self.dict_all[section_id].keys():
                     for submission_data in self.dict_all[section_id][student_id]:
@@ -273,7 +273,7 @@ class GradingDashboard:
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
 
         # Figure out what color to assign each cell for each LO, in order of LO appearance in self.all_LOs
-        lo_color_indices = [[] for _ in range(len(self.all_LOs))]
+        lo_color_indices = [[] for _ in range(len(self.sorted_LOs))]
         for lo_index in range(len(self.all_LOs)):
 
             # If the max count equals the min count, display the average color for all
@@ -295,22 +295,13 @@ class GradingDashboard:
         data.extend(lo_scores_counts)
 
         column_names = ['Section name', 'Total scores assigned']
-        column_names.extend(['Score count in ' + lo_name for lo_name in self.all_LOs])
+        column_names.extend(['Score count in ' + lo_name for lo_name in self.sorted_LOs])
         
         column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
         tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
-        print(tot_lo_color_indices)
-        print(tot_lo_colors)
-        print(len(column_colors))
-        column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.all_LOs))])
-        print(len(column_colors))
-
-        print("\n\n\n\n\n\n\n\n")
-        print("values:", ['Section name'].extend(self.all_LOs))
-        print("data:", data)
-        print("column colors:")
-        for color_lst in column_colors:
-            print(color_lst)
+        
+        column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
+        
         
         # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=column_names),
@@ -592,30 +583,24 @@ class GradingDashboard:
         # Flatten the list of scores
         all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
         
-        # Make histogram
-        
-        
-        fig = px.histogram(x=all_scores_flat,
+        # Make histogram    
+        fig = go.Figure(data=go.Histogram(
+                    x=all_scores_flat,
+                    xbins=dict(
+                        start=0,
+                        end=5,
+                        size=bin_size),
                     opacity=0.8,
-                    marginal="rug",
-                    text_auto=True,
-                    nbins=int(10))
-        
-        #fig = go.Figure(data=go.Histogram(
-        #            x=all_scores_flat,
-        #            xbins=dict(
-        #                start=0,
-        #                end=5,
-        #                size=bin_size),
-        #            opacity=0.8,
-        #            showlegend=False,
-        #            text=['a','b','c']))
+                    showlegend=False,
+                    text=['a','b','c']))
         
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
         
         fig.update_traces(marker_line_width=1,marker_line_color="white")
+        # Count total number of students
+        student_count_tot = len([student_id for section in self.dict_all.keys() for student_id in self.dict_all[section].keys() ]) 
         fig.update_layout(
-            title=f'Score distribution across all sections ({len(self.section_ids)} sections)',
+            title=f'Score distribution across all sections ({len(self.section_ids)} sections, {student_count_tot} students)',
             xaxis_title='Score',
             yaxis_title='Count')
         
@@ -957,10 +942,15 @@ class GradingDashboard:
         # Change the bar mode to stack
         fig.update_layout(
             title=f'<b>Score distribution per LO</b><br>Stacked barplots.',
-            xaxis_title='Section',
+            xaxis_title='Learning Outcome',
             yaxis_title='Percentage',
             height=800,
             barmode='stack')
+        
+        for i, lo_name in enumerate(self.sorted_LOs):
+            fig.add_annotation(x=lo_name, y=1, yshift=10,
+                               text=f'{int(sum(LO_scores_count[i]))} Score' + ('s' if int(sum(LO_scores_count[i])) > 1 else ''), 
+                               showarrow=False)
         
         fig.layout.yaxis.tickformat = '0%'
 
