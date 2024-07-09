@@ -365,8 +365,12 @@ class GradingDashboard:
         self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
 
         # Overall average score and SDs, weighted by number of students. This defines the "average" section
-        overall_mean = sum(self.section_means * self.section_sizes)/sum(self.section_sizes)
-        overall_SD = sum(self.section_SDs * self.section_sizes)/sum(self.section_sizes)
+        print("Section sizes:", self.section_sizes)
+        print("Section means:", self.section_means)
+        overall_mean = sum([val for val in (self.section_means * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
+        print(overall_mean)
+
+        overall_SD = sum([val for val in (self.section_SDs * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
         average_section_size = np.mean(self.section_sizes)
 
         p_values = []
@@ -459,11 +463,11 @@ class GradingDashboard:
         this_table_section_colors = self.table_section_colors[:]
         this_table_section_colors.insert(0, 'white')
 
-        data[1].insert(0, '<b>' + str(round(np.mean(self.section_means), 3)) + '</b>')
+        data[1].insert(0, '<b>' + str(round(overall_mean, 3)) + '</b>')
         mean_colors = list(np.array(redblue_colorscale)[mean_color_indices])
         mean_colors.insert(0, 'white')
 
-        data[2].insert(0, '<b>' + str(round(np.mean(self.section_SDs), 3)) + '</b>')
+        data[2].insert(0, '<b>' + str(round(overall_SD, 3)) + '</b>')
         sd_color_indices.insert(0, 0)
         data[3].insert(0, ' <b>NA</b>')
         p_colors.insert(0, 'white')
@@ -584,7 +588,7 @@ class GradingDashboard:
 
         # Flatten the list of scores
         all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
-        
+
         # Make histogram    
         fig = go.Figure(data=go.Histogram(
                     x=all_scores_flat,
@@ -593,12 +597,37 @@ class GradingDashboard:
                         end=5,
                         size=bin_size),
                     opacity=0.8,
-                    showlegend=False,
-                    text=['a','b','c']))
+                    showlegend=False))
         
+        # Manually calculate the height of the bins to write it as text
+        counts = []
+        left_edge = 0
+        all_scores_flat_sorted = sorted(all_scores_flat)
+        current_index = 0
+        while left_edge < 5:
+            left_edge += 0.2
+
+            old_index = current_index
+            # If this region contains scores
+            while all_scores_flat_sorted[current_index] < left_edge + 0.1999:
+                # count how many scores
+                current_index += 1
+                if current_index == len(all_scores_flat_sorted):
+                    break
+            # If there was any, add it to counts
+            if current_index - old_index > 0:
+                counts.append(current_index - old_index)
+            # If there were none, but this is not first bin, add empty text
+            elif len(counts) > 0:
+                counts.append('')
+
+            if current_index == len(all_scores_flat_sorted):
+                break
+                
+
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
         
-        fig.update_traces(marker_line_width=1,marker_line_color="white")
+        fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
         # Count total number of students
         student_count_tot = len([student_id for section in self.dict_all.keys() for student_id in self.dict_all[section].keys() ]) 
         fig.update_layout(
@@ -1103,8 +1132,8 @@ def create_data(file_name:str, total_scores:int):
 
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 28)
-gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6)
+new_data_name = create_data('fake_data_986100.py', 15)
+gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
 
 
 gd.make_full_report()
