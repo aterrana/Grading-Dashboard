@@ -99,14 +99,11 @@ class GradingDashboard:
                     self.all_avgscores[-1].append(np.mean(student_scores))
             else:
                 self.all_avgscores[-1].append(np.nan)
-            print("This section scores", self.all_scores[i])
 
-        print("all_scores:", self.all_scores)
-        print("all_avgscores:", self.all_avgscores)
-        print("All sections with something", self.section_ids)
-        print("All sections with scores", self.section_ids_w_scores)
-
-
+        #print("all_scores:", self.all_scores)
+        #print("all_avgscores:", self.all_avgscores)
+        #print("All sections with something", self.section_ids)
+        #print("All sections with scores", self.section_ids_w_scores)
         
         # Set up the colors for the different sections
         self.section_colors = disc_colors.Dark24[:len(self.section_ids)]
@@ -137,7 +134,6 @@ class GradingDashboard:
             comment_counter = 0
             comment_wordcounter = 0
             student_count = 0
-            print(self.dict_all[section_id].keys())
             for student_id in self.dict_all[section_id].keys():
                 student_count += 1
                 for submission_data in self.dict_all[section_id][student_id]:
@@ -267,7 +263,7 @@ class GradingDashboard:
 
         # Calculate total number of scores per section
         total_scores_given = np.array(lo_scores_counts[0])
-        for lo_index in range(len(lo_scores_counts)-1):
+        for lo_index in range(1, len(lo_scores_counts)-1):
             total_scores_given += np.array(lo_scores_counts[lo_index])
 
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
@@ -289,7 +285,6 @@ class GradingDashboard:
         else:
             # Otherwise display the linear change
             tot_lo_color_indices = [int(10+40*(val-min(total_scores_given))/(max(total_scores_given)-min(total_scores_given))) for val in total_scores_given]
-        print("lo_color_indices: ", lo_color_indices)
         # Collect all columns in one list
         data = [self.section_names, total_scores_given]
         data.extend(lo_scores_counts)
@@ -365,10 +360,7 @@ class GradingDashboard:
         self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
 
         # Overall average score and SDs, weighted by number of students. This defines the "average" section
-        print("Section sizes:", self.section_sizes)
-        print("Section means:", self.section_means)
         overall_mean = sum([val for val in (self.section_means * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
-        print(overall_mean)
 
         overall_SD = sum([val for val in (self.section_SDs * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
         average_section_size = np.mean(self.section_sizes)
@@ -477,6 +469,8 @@ class GradingDashboard:
         for column_i in range(1, 5):
             for i in range(len(data[column_i])):
                 data[column_i][i] = str(data[column_i][i])
+                if data[column_i][i] == 'nan' and column_i != 3:
+                    data[column_i][i] = ' NA'
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section name', 
@@ -647,25 +641,17 @@ class GradingDashboard:
         else:
             scores = self.all_scores
 
-        print("ANOVA's scores", scores)
-        print("self.all_avgscores", self.all_avgscores)
         # Perform the ANOVA test
         try:
             # Remove all nan from scores
             filtered_scores = []
             for sublist in scores:
-                print("sub:", sublist)
                 if not np.isnan(sublist[0][0]):
                     filtered_scores.append([val for lst in sublist for val in lst])
-            print("filtered scores!:")
-            print(filtered_scores)
 
 
             f_stat, p_value = sts.f_oneway(*filtered_scores)
             #f_stat, p_value = f_stat[0], p_value[0]
-            print("Anova stuff")
-            print(f_stat)
-            print(p_value)
             if np.isnan(f_stat) or np.isnan(p_value):
                 raise Exception("Not enough data")
 
