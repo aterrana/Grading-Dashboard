@@ -587,7 +587,7 @@ class GradingDashboard:
         ''' Creates plot that shows a single histogram of student scores distribution '''
 
         # Flatten the list of scores
-        all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst]
+        all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst if not np.isnan(avg_score)]
 
         # Make histogram    
         fig = go.Figure(data=go.Histogram(
@@ -624,7 +624,6 @@ class GradingDashboard:
             if current_index == len(all_scores_flat_sorted):
                 break
                 
-
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
         
         fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
