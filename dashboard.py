@@ -361,9 +361,6 @@ class GradingDashboard:
         self.section_means = np.array([np.mean(section_avgs) for section_avgs in self.all_avgscores])
         self.section_SDs = np.array([np.std(section_avgs) if len(section_avgs) > 0 else np.nan for section_avgs in self.all_avgscores])
 
-        print("section means:", self.section_means)
-        print("section SDs:", self.section_SDs)
-
         # Number of students in each section
         self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
 
@@ -424,7 +421,6 @@ class GradingDashboard:
         max_abs_effect = max([abs(val) for val in effect_sizes])
         
         # If all effect sizes are equal
-        print("Effect sizes", effect_sizes)
         if max_abs_effect - min_abs_effect == 0 or np.isnan(effect_sizes).any() or math.isinf(max_abs_effect):
             effect_color_indices = [10] * len(effect_sizes)
         else:
@@ -459,18 +455,23 @@ class GradingDashboard:
                 [round(val,5) for val in p_values],
                 [round(val,5) for val in effect_sizes]]
         
-        data[0].append('Average')
+        data[0].insert(0, '<b>Average</b>')
         this_table_section_colors = self.table_section_colors[:]
-        this_table_section_colors.append('white')
-        data[1].append(round(np.mean(self.section_means), 3))
-        mean_color_indices.append(50)
-        data[2].append(round(np.mean(self.section_SDs), 3))
-        sd_color_indices.append(0)
-        data[3].append(np.nan)
-        p_colors.append('white')
-        data[4].append(np.nan)
-        effect_color_indices.append(0)
-        print(self.section_names)
+        this_table_section_colors.insert(0, 'white')
+
+        data[1].insert(0, '<b>' + str(round(np.mean(self.section_means), 3)) + '</b>')
+        mean_color_indices.insert(0, 50)
+
+        data[2].insert(0, '<b>' + str(round(np.mean(self.section_SDs), 3)) + '</b>')
+        sd_color_indices.insert(0, 0)
+        data[3].insert(0, ' <b>NA</b>')
+        p_colors.insert(0, 'white')
+        data[4].insert(0, '<b>NA</b>')
+        effect_color_indices.insert(0, 0)
+
+        for column_i in range(1, 5):
+            for i in range(len(data[column_i])):
+                data[column_i][i] = str(data[column_i][i])
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section name', 
@@ -606,7 +607,6 @@ class GradingDashboard:
         
         # Add plot to the report
         self.figures.append(fig)
-
 
     def ANOVA_test(self, averages=True) -> None:
         ''' Performs oneway ANOVA test, and creates html text presenting the results. '''
