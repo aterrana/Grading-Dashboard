@@ -460,7 +460,8 @@ class GradingDashboard:
         this_table_section_colors.insert(0, 'white')
 
         data[1].insert(0, '<b>' + str(round(np.mean(self.section_means), 3)) + '</b>')
-        mean_color_indices.insert(0, 50)
+        mean_colors = list(np.array(redblue_colorscale)[mean_color_indices])
+        mean_colors.insert(0, 'white')
 
         data[2].insert(0, '<b>' + str(round(np.mean(self.section_SDs), 3)) + '</b>')
         sd_color_indices.insert(0, 0)
@@ -482,7 +483,7 @@ class GradingDashboard:
                                         cells=dict(values=data,
                                                     fill_color=[
                                                         this_table_section_colors,
-                                                        np.array(redblue_colorscale)[mean_color_indices],
+                                                        mean_colors,
                                                         np.array(greys_colorscale)[sd_color_indices],
                                                         p_colors,
                                                         np.array(greys_colorscale)[effect_color_indices]
@@ -494,7 +495,7 @@ class GradingDashboard:
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
         section_color_dict = {section_id:this_table_section_colors[i] for i, section_id in enumerate(data[0])}
-        mean_color_dict = {section_id:redblue_colorscale[mean_color_indices[i]] for i, section_id in enumerate(data[0])}
+        mean_color_dict = {section_id:mean_colors[i] for i, section_id in enumerate(data[0])}
         sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(data[0])}
         p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(data[0])}
         effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
