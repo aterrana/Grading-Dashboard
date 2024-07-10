@@ -263,7 +263,7 @@ class GradingDashboard:
 
         # Calculate total number of scores per section
         total_scores_given = np.array(lo_scores_counts[0])
-        for lo_index in range(1, len(lo_scores_counts)-1):
+        for lo_index in range(1, len(lo_scores_counts)):
             total_scores_given += np.array(lo_scores_counts[lo_index])
 
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
@@ -1123,7 +1123,7 @@ def create_data(file_name:str, total_scores:int):
 
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 15)
+new_data_name = create_data('fake_data_986100.py', 10)
 gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
 
 
