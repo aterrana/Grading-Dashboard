@@ -297,7 +297,6 @@ class GradingDashboard:
         
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
         
-        
         # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=column_names),
                                         cells=dict(values=data,
@@ -308,40 +307,43 @@ class GradingDashboard:
         df = pd.DataFrame(data).T.sort_values(0).T
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        #section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
         #total_scores_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
         #print("column colors length:")
         #print(len(column_colors))
         #for color_lst in column_colors:
         #    print(color_lst)
-        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
-        #scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
-        #comm_color_dict = {section_id:greys_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
-        #word_color_dict = {section_id:greys_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
+        total_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
 
+        lo_color_dicts = [{section_id:column_colors[lo_name_i+2][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(self.sorted_LOs))]
 
         #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
         #                  {"name": "Sort by total scores", "col_i": 1}]
         #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
         ## Create sorting drop-down menu
         fig.update_layout(
-        #    updatemenus=[dict(
-        #            buttons= [dict(
-        #                    method= "restyle",
-        #                    label= selection["name"],
-        #                    args= [{"cells": {"values": df.T.sort_values(selection["col_i"]).T.values, # Sort all values according to selection
-        #                                        "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]], # Ensure all colors are with the correct cell
-        #                                                [total_scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]],
-        #                                                *[[score_count_color_dicts[lo_index][section_id] for section_id in df.T.sort_values(selection["col_i"]).T.values[0]] for lo_index in self.all_LOs]
-        #                                                ]),
-        #                                        "height": 30}},[0]]
-        #                    )
-        #                    for selection in menu_selection
-        #            ],
-        #            direction = "down",
-        #            y = 1.15,
-        #            x = 1
-        #        )],
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= selection["name"],
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
+                                                "fill": dict(color=[
+                                                        [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                        *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
+                                                "height": 30}}, [0]]
+                            )
+                            for selection in [
+                                {"name": "Sort by section name", "col_i": 0},
+                                {"name": "Sort by total scores", "col_i": 1},
+                                *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(self.sorted_LOs)]
+                            ]
+                    ],
+                    direction = "down",
+                    y = 1.15,
+                    x = 1
+                )],
                 height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
         
@@ -469,8 +471,12 @@ class GradingDashboard:
         for column_i in range(1, 5):
             for i in range(len(data[column_i])):
                 data[column_i][i] = str(data[column_i][i])
-                if data[column_i][i] == 'nan' and column_i != 3:
-                    data[column_i][i] = ' NA'
+                if data[column_i][i] == 'nan':
+                    if column_i != 3:
+                        data[column_i][i] = ' NA'
+                    else:
+                        data[column_i][i] = 'NA'
+
 
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section name', 
