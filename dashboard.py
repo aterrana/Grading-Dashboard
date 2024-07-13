@@ -539,6 +539,108 @@ class GradingDashboard:
         
         self.figures.append(fig)
 
+    def mann_whitney_grid(self) -> None:
+
+        # Calculate mann-whitney test between each combination of groups.
+        # Calculate the Mann-Whitney U test
+        # null hypothesis is that the prob of X > Y equals prob of Y > X
+        mannwhitney_ustats = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals_signif = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals_signif_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        wilcoxon_data = np.zeros((len(self.section_names), len(self.section_names)))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    mannwhitney_ustats[a_i, b_i] = np.nan
+                    mannwhitney_pvals[a_i, b_i] = np.nan
+                    mannwhitney_pvals_signif[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    mannwhitney_ustats[a_i, b_i] = 0
+                    mannwhitney_pvals[a_i, b_i] = 0
+                    mannwhitney_pvals_signif[a_i, b_i] = 0.6
+                    mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<b>X</b>'
+
+                    continue
+
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+                        print(self.all_avgscores[a_i])
+                        print(self.all_avgscores[b_i])
+                        u_stat, p_value_mw = sts.mannwhitneyu(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+                        #stat, p_value_w = sts.wilcoxon(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+                        mannwhitney_ustats[a_i, b_i] = u_stat
+                        mannwhitney_pvals[a_i, b_i] = p_value_mw
+                        if p_value_mw < 0.05:
+                            mannwhitney_pvals_signif[a_i, b_i] = 0.1
+                            mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.05'
+                        elif p_value_mw < 0.1:
+                            mannwhitney_pvals_signif[a_i, b_i] = 0.25
+                            mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.1'
+                        else:
+                            mannwhitney_pvals_signif[a_i, b_i] = 0.73
+                        #wilcoxon_data[a_i, b_i] = stat
+
+        print(mannwhitney_ustats)
+        print(mannwhitney_pvals)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_ustats = np.transpose(np.array(mannwhitney_ustats))
+        mannwhitney_ustats = [list(row) for row in reversed(mannwhitney_ustats)]
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_ustats,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white')
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+        #p_val_significance = np.array(mannwhitney_pvals) < 0.05
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_pvals = np.transpose(np.array(mannwhitney_pvals))
+        mannwhitney_pvals = [list(row) for row in reversed(mannwhitney_pvals)]
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_pvals,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white')
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+        print(mannwhitney_pvals_signif)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_pvals_signif = np.transpose(np.array(mannwhitney_pvals_signif))
+        mannwhitney_pvals_signif = [list(row) for row in reversed(mannwhitney_pvals_signif)]
+        print(mannwhitney_pvals_signif)
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_pvals_signif,
+                                        zmax=1,
+                                        zmin=0,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)),
+                                        text=mannwhitney_pvals_signif_text,
+                                        hoverongaps=False,
+                                        customdata=mannwhitney_pvals,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        texttemplate="%{text}",
+                                        colorscale='RdBu'))
+        
+        fig.update_layout(plot_bgcolor='white', 
+                          title="<b>Significance of Mann-Whitney test between each section</b><br>with a significance level of a=0.05")
+        fig.update_traces(showscale=False)
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
     def section_avg_scores(self, section_id: int) -> list:
         ''' Returns a list with the average score of each student for this section '''
         
@@ -1051,6 +1153,7 @@ class GradingDashboard:
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
+        self.mann_whitney_grid()
         self.ANOVA_test(False)
         self.progress_table()
         self.LO_progress_table()
@@ -1123,8 +1226,8 @@ def create_data(file_name:str, total_scores:int):
 
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 10)
-gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6)
+new_data_name = create_data('fake_data_986100.py', 22)
+gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6)
 
 
 gd.make_full_report()
