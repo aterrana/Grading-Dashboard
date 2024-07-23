@@ -371,7 +371,7 @@ class GradingDashboard:
         overall_SD = sum([val for val in (self.section_SDs * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
         average_section_size = np.mean(self.section_sizes)
 
-        p_values = []
+        signif_count = np.zeros(len(self.section_names))
         effect_sizes = []
         # Perform two-tailed difference of means test
         # between each section and the "average" section
@@ -385,8 +385,17 @@ class GradingDashboard:
             
             # degrees of freedom
             df = min(average_section_size-1, self.section_sizes[i]-1)
-            
-            p_values.append(sts.t.sf(abs(t_stat), df) * 2)
+        
+        # For each group pair
+        for a_i in range(len(self.section_names)):
+            for b_i in range(a_i+1, len(self.section_names)):
+                # Count the number of other sections this section is significantly different with
+                _, p_value = sts.ttest_ind(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
+                # If this pair is significantly different, increment corresponding position in signif_count
+                if p_value < 0.05:
+                    signif_count[a_i] += 1
+                    signif_count[b_i] += 1
 
         # Assign colors to cells
 
@@ -431,7 +440,7 @@ class GradingDashboard:
 
         # Manual logic for coloring the p-values
         p_colors = []
-        for val in p_values:
+        for val in signif_count:
             if val < 0.05: #0.05
                 # significant
                 p_colors.append('red')
@@ -454,7 +463,7 @@ class GradingDashboard:
         data = [self.section_names[:],
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
-                [round(val,5) for val in p_values],
+                [round(val,5) for val in signif_count],
                 [round(val,5) for val in effect_sizes]]
         
         data[0].insert(0, '<b>Average</b>')
@@ -558,7 +567,6 @@ class GradingDashboard:
         cohens_d_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
         t_test_pvals_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
         t_test_pvals_colori = np.zeros((len(self.section_names), len(self.section_names)))
-        p_value_average = np.zeros(len(self.section_names))
         for a_i in range(len(self.section_names)):
             for b_i in range(len(self.section_names)):
                 
@@ -584,9 +592,6 @@ class GradingDashboard:
                         # Calculate p_value
                         _, p_value = sts.ttest_ind(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
 
-                        p_value_average[a_i] += p_value
-                        p_value_average[b_i] += p_value
-
                         # Calculate effect size (Cohen's d), https://en.wikipedia.org/wiki/Effect_size#:~:text=large.%5B23%5D-,Cohen%27s,-d%20%5Bedit
                         # variance of each group
                         var_a = np.var(self.all_avgscores[a_i], ddof=1)
@@ -603,10 +608,6 @@ class GradingDashboard:
                             t_test_pvals_colori[a_i, b_i] = 0.1
                         elif p_value < 0.1:
                             t_test_pvals_colori[a_i, b_i] = 0.25
-        
-        print("p value average:", p_value_average)
-        p_value_average = p_value_average / (len(self.section_names) - 1)
-        print("p value average:", p_value_average)
 
         # Do some flipping around so that it becomes a lower triangle down-left
         t_test_pvals_text = [list(row) for row in reversed(t_test_pvals_text)]
@@ -658,6 +659,7 @@ class GradingDashboard:
 
         self.figures.append(fig)
 
+    # Not used currently
     def mann_whitney_grid(self) -> None:
         '''
         Mann-Whitney tests whether two groups are different or not (come from the same distribution)
@@ -778,6 +780,7 @@ class GradingDashboard:
 
         self.figures.append(fig)
 
+    # Not used currently
     def prob_of_superiority_grid(self) -> None:
         '''
         Mann-Whitney tests whether two groups are different or not (come from the same distribution)
@@ -987,7 +990,6 @@ class GradingDashboard:
             output += "Couldn't perform ANOVA test because:<br>" + str(e)
             self.figures.append(output)
 
-
     def boxplots(self, averages=True) -> None:
         ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
 
@@ -1181,7 +1183,6 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
-
     def LO_stackedbar_plot(self, LO_name:str) -> None:
         ''' Create stacked barplot with percentages '''
         
@@ -1349,12 +1350,11 @@ class GradingDashboard:
         # Sort the lo names according to the number of scores
         return [LO_name for _, LO_name in sorted(zip(lo_score_counts, self.all_LOs), key=lambda pair: pair[0], reverse=True)]
 
-
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
-        self.mann_whitney_grid()
-        self.prob_of_superiority_grid()
+        #self.mann_whitney_grid()
+        #self.prob_of_superiority_grid()
         self.t_test_grid()
         self.ANOVA_test(False)
         self.progress_table()
@@ -1376,7 +1376,6 @@ class GradingDashboard:
         self.section_id_table()
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
-
 
 import json
 # Create new file with only portions of fake_data
