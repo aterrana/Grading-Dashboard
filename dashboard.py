@@ -369,23 +369,10 @@ class GradingDashboard:
         overall_mean = sum([val for val in (self.section_means * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
 
         overall_SD = sum([val for val in (self.section_SDs * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
-        average_section_size = np.mean(self.section_sizes)
+        #average_section_size = np.mean(self.section_sizes)
 
-        signif_count = np.zeros(len(self.section_names))
-        effect_sizes = []
-        # Perform two-tailed difference of means test
-        # between each section and the "average" section
-        for i in range(len(self.section_means)):
-            # Standard error
-            standard_err = np.sqrt(self.section_SDs[i]**2 / self.section_sizes[i] + \
-                                   overall_SD**2 / average_section_size)
-            # Effect size, and t-statistic
-            effect_sizes.append((self.section_means[i] - overall_mean)/overall_SD)
-            t_stat = (self.section_means[i] - overall_mean)/standard_err
-            
-            # degrees of freedom
-            df = min(average_section_size-1, self.section_sizes[i]-1)
-        
+        signif_count = np.zeros(len(self.section_names), int)
+        cohens_d_vals = np.zeros(len(self.section_names), float)
         # For each group pair
         for a_i in range(len(self.section_names)):
             for b_i in range(a_i+1, len(self.section_names)):
@@ -396,6 +383,26 @@ class GradingDashboard:
                 if p_value < 0.05:
                     signif_count[a_i] += 1
                     signif_count[b_i] += 1
+
+                    # Calculate cohen's d between the two groups
+                    # Calculate effect size (Cohen's d), https://en.wikipedia.org/wiki/Effect_size#:~:text=large.%5B23%5D-,Cohen%27s,-d%20%5Bedit
+                    # variance of each group
+                    var_a = np.var(self.all_avgscores[a_i], ddof=1)
+                    var_b = np.var(self.all_avgscores[b_i], ddof=1)
+
+                    # Pooled standard deviation
+                    pooled_sd = np.sqrt(((len(self.all_avgscores[a_i])-1)*var_a + (len(self.all_avgscores[b_i])-1)*var_b ) / (len(self.all_avgscores[a_i] + self.all_avgscores[b_i])-2) )
+                    cohens_d = (np.mean(self.all_avgscores[a_i]) - np.mean(self.all_avgscores[b_i])) / pooled_sd
+                    
+                    # Store the accumulate absolute effect size, will be divided by count later
+                    cohens_d_vals[a_i] += abs(cohens_d)
+                    cohens_d_vals[b_i] += abs(cohens_d)
+
+        for i in range(len(self.section_names)):
+            if signif_count[i] == 0:
+                cohens_d_vals[i] = 0
+            else:
+                cohens_d_vals[i] = round(cohens_d_vals[i] / signif_count[i], 2)
 
         # Assign colors to cells
 
@@ -427,36 +434,32 @@ class GradingDashboard:
                     sd_color_indices.append(0)
                 else:
                     sd_color_indices.append(int(10+40*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
-        # precalc the min and max according to absolute value of effect size
-        min_abs_effect = min([abs(val) for val in effect_sizes]) 
-        max_abs_effect = max([abs(val) for val in effect_sizes])
         
+        # precalc the min and max according to absolute value of effect size
+        cohens_d_numbers = [0 if np.isnan(val) else val for val in cohens_d_vals]
+        min_abs_effect = min([abs(val) for val in cohens_d_numbers]) 
+        max_abs_effect = max([abs(val) for val in cohens_d_numbers])
+
+        #only_number_effect = [val for val in effect_sizes if isinstance(val, float) or isinstance(val, int)]
         # If all effect sizes are equal
-        if max_abs_effect - min_abs_effect == 0 or np.isnan(effect_sizes).any() or math.isinf(max_abs_effect):
-            effect_color_indices = [10] * len(effect_sizes)
+        if max_abs_effect - min_abs_effect == 0 or math.isinf(max_abs_effect):
+            effect_color_indices = [10] * len(cohens_d_vals)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
-            effect_color_indices = [int(10+40*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
+            effect_color_indices = [int(10+40*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in cohens_d_numbers]
 
-        # Manual logic for coloring the p-values
-        p_colors = []
-        for val in signif_count:
-            if val < 0.05: #0.05
-                # significant
-                p_colors.append('red')
-            else:
-                # Not significant
-                p_colors.append('white') 
 
-            #elif val < 0.1: #0.1
-            #    # close to significant
-            #    p_colors.append('orange')
-            #elif val < 0.3: #0.3
-            #    # not strongly non-significant
-            #    p_colors.append('mistyrose') 
-            #else:
-            #    # strongly not significant
-            #    p_colors.append('palegreen')
+        # precalc the min and max according to absolute value of effect size
+        min_signif_count = min([val for val in signif_count]) 
+        max_signif_count = max([val for val in signif_count])
+
+        # If all effect sizes are equal
+        if max_signif_count - min_signif_count == 0:
+            signif_count_color_indices = [10] * len(signif_count)
+        else:
+            # Convert nan to 0's for color indices
+            signif_count_color_indices = [int(10+40*(abs(val)-min_signif_count)/(max_signif_count-min_signif_count)) for val in signif_count]
+        
                 
         # Create table
         
@@ -464,7 +467,7 @@ class GradingDashboard:
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
                 [round(val,5) for val in signif_count],
-                [round(val,5) for val in effect_sizes]]
+                [round(val,5) for val in cohens_d_vals]]
         
         data[0].insert(0, '<b>Average</b>')
         this_table_section_colors = self.table_section_colors[:]
@@ -476,8 +479,8 @@ class GradingDashboard:
 
         data[2].insert(0, '<b>' + str(round(overall_SD, 3)) + '</b>')
         sd_color_indices.insert(0, 0)
-        data[3].insert(0, ' <b>NA</b>')
-        p_colors.insert(0, 'white')
+        data[3].insert(0, '<b>' + str(round(np.mean(signif_count), 2)) + '</b>')
+        signif_count_color_indices.insert(0, 0)
         data[4].insert(0, '<b>NA</b>')
         effect_color_indices.insert(0, 0)
 
@@ -495,14 +498,14 @@ class GradingDashboard:
                                                     ['Section name', 
                                                      'Mean score',
                                                      'Standard Deviation',
-                                                     'p-values',
-                                                     'effect size']),
+                                                     'Count of significant comparisons',
+                                                     'Avg effect size among significant']),
                                         cells=dict(values=data,
                                                     fill_color=[
                                                         this_table_section_colors,
                                                         mean_colors,
                                                         np.array(greys_colorscale)[sd_color_indices],
-                                                        p_colors,
+                                                        np.array(greys_colorscale)[signif_count_color_indices],
                                                         np.array(greys_colorscale)[effect_color_indices]
                                                     ],
                                                     height=30))])
@@ -514,7 +517,7 @@ class GradingDashboard:
         section_color_dict = {section_id:this_table_section_colors[i] for i, section_id in enumerate(data[0])}
         mean_color_dict = {section_id:mean_colors[i] for i, section_id in enumerate(data[0])}
         sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(data[0])}
-        p_color_dict = {section_id:p_colors[i] for i, section_id in enumerate(data[0])}
+        p_color_dict = {section_id:np.array(greys_colorscale)[signif_count_color_indices][i] for i, section_id in enumerate(data[0])}
         effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
         
 
@@ -525,20 +528,20 @@ class GradingDashboard:
                             method= "restyle",
                             label= selection["name"],
                                                                                             # Sort ascending only for column 0 and 3
-                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values, # Sort all values according to selected column
-                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]], # Ensure colors are with correct cell
-                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
-                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
-                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]],
-                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0 or selection["col_i"]==3).T.values[0]]
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values, # Sort all values according to selected column
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure colors are with correct cell
+                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]]
                                                         ]), 
                                                 "height": 30}},[0]]
                             )
                             for selection in [{"name": "Sort by section name", "col_i": 0}, 
                                       {"name": "Sort by mean", "col_i": 1}, 
                                       {"name": "Sort by standard deviation", "col_i": 2}, 
-                                      {"name": "Sort by p-value", "col_i": 3}, 
-                                      {"name": "Sort by effect size", "col_i": 4}]
+                                      {"name": "Sort by signif count", "col_i": 3}, 
+                                      {"name": "Sort by avg effect size", "col_i": 4}]
                     ],
                     direction = "down",
                     y = 1.15,
