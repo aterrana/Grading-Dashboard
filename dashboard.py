@@ -22,7 +22,7 @@ class GradingDashboard:
     2. Run all methods corresponding to the graphs and components you want in the report (in the order you want them to appear)
     3. Run create_html to create the .html file of the report
     '''
-    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None) -> None:
+    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None, student_count: list = []) -> None:
         '''
         Sets up global lists and dictionaries
         '''
@@ -44,6 +44,7 @@ class GradingDashboard:
             ...
 
         self.target_scorecount = target_scorecount
+        self.student_count = student_count
 
         # Keep track of section ids, average scores, LO names, globally
         self.section_ids = list(dict_all_init.keys())
@@ -129,7 +130,7 @@ class GradingDashboard:
         scores_counts = []
         comments_counts = []
         comment_wordcounts = []
-        for section_id in self.section_ids:
+        for i, section_id in enumerate(self.section_ids):
             score_counter = 0
             comment_counter = 0
             comment_wordcounter = 0
@@ -142,7 +143,10 @@ class GradingDashboard:
                     if len(submission_data['comment']) > 1:
                         comment_counter += 1
                         comment_wordcounter += len(submission_data['comment'].split(' '))
-            scores_counts.append(round(score_counter/student_count,2))
+            if len(self.student_count) == 0:
+                scores_counts.append(round(score_counter/student_count,2))
+            else:
+                scores_counts.append(round(score_counter/self.student_count[i],2))
             comments_counts.append(round(comment_counter/student_count,2))
             comment_wordcounts.append(round(comment_wordcounter/student_count,2))
 
@@ -539,7 +543,132 @@ class GradingDashboard:
         
         self.figures.append(fig)
 
+    def t_test_grid(self) -> None:
+        '''
+        Normal difference of means test, assumes normality of data 
+        Assummptions:
+        - continuous variables
+        - Normal distribution of data
+        - independent groups
+        - Sufficient sample size (preferable more than ~20)
+        '''
+
+        # Calculate p-value between each group
+        cohens_d_vals = np.zeros((len(self.section_names), len(self.section_names)))
+        cohens_d_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        t_test_pvals_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        t_test_pvals_colori = np.zeros((len(self.section_names), len(self.section_names)))
+        p_value_average = np.zeros(len(self.section_names))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    cohens_d_text[b_i][a_i] = ''
+                    cohens_d_vals[a_i, b_i] = np.nan
+                    t_test_pvals_text[b_i][a_i] = ''
+                    t_test_pvals_colori[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    cohens_d_text[b_i][a_i] = '<b>X</b>'
+                    cohens_d_vals[a_i, b_i] = 0
+                    t_test_pvals_text[b_i][a_i] = '<b>X</b>'
+                    t_test_pvals_colori[a_i, b_i] = 0.6
+                    continue
+                else:
+                    t_test_pvals_colori[a_i, b_i] = 0.73
+
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+
+                        # Calculate p_value
+                        _, p_value = sts.ttest_ind(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
+                        p_value_average[a_i] += p_value
+                        p_value_average[b_i] += p_value
+
+                        # Calculate effect size (Cohen's d), https://en.wikipedia.org/wiki/Effect_size#:~:text=large.%5B23%5D-,Cohen%27s,-d%20%5Bedit
+                        # variance of each group
+                        var_a = np.var(self.all_avgscores[a_i], ddof=1)
+                        var_b = np.var(self.all_avgscores[b_i], ddof=1)
+
+                        # Pooled standard deviation
+                        pooled_sd = np.sqrt( ( (len(self.all_avgscores[a_i])-1)*var_a + (len(self.all_avgscores[b_i])-1)*var_b ) / (len(self.all_avgscores[a_i] + self.all_avgscores[b_i])-2) )
+                        cohens_d = (np.mean(self.all_avgscores[a_i]) - np.mean(self.all_avgscores[b_i])) / pooled_sd
+
+                        cohens_d_vals[a_i, b_i] = round(cohens_d, 2)
+                        cohens_d_text[b_i][a_i] = str(round(cohens_d, 2))
+                        t_test_pvals_text[b_i][a_i] = str(round(p_value, 5))
+                        if p_value < 0.05 and not p_value == 0:
+                            t_test_pvals_colori[a_i, b_i] = 0.1
+                        elif p_value < 0.1:
+                            t_test_pvals_colori[a_i, b_i] = 0.25
+        
+        print("p value average:", p_value_average)
+        p_value_average = p_value_average / (len(self.section_names) - 1)
+        print("p value average:", p_value_average)
+
+        # Do some flipping around so that it becomes a lower triangle down-left
+        t_test_pvals_text = [list(row) for row in reversed(t_test_pvals_text)]
+        cohens_d_text = [list(row) for row in reversed(cohens_d_text)]
+        t_test_pvals_colori = np.transpose(np.array(t_test_pvals_colori))
+        t_test_pvals_colori = [list(row) for row in reversed(t_test_pvals_colori)]
+        fig = go.Figure(data=go.Heatmap(z=t_test_pvals_colori,
+                                        zmax=1,
+                                        zmin=0,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        customdata=t_test_pvals_text,
+                                        text=t_test_pvals_text,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        texttemplate="%{text}",
+                                        hoverongaps=False,
+                                        colorscale='RdBu'))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="<b>p-values from T tests</b>")
+        fig.update_traces(showscale=False)
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+
+        # Do some flipping around so that it becomes a lower triangle down-left
+        cohens_d_vals = np.transpose(np.array(cohens_d_vals))
+        cohens_d_vals = [list(row) for row in reversed(cohens_d_vals)]
+        fig = go.Figure(data=go.Heatmap(z=cohens_d_vals,
+                                        zmax=1,
+                                        zmin=-1,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        customdata=cohens_d_vals,
+                                        text=cohens_d_text,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        texttemplate="%{text}",
+                                        hoverongaps=False,
+                                        colorscale='RdBu'))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
     def mann_whitney_grid(self) -> None:
+        '''
+        Mann-Whitney tests whether two groups are different or not (come from the same distribution)
+        Variables are assumed to be continuous (so student averages, not individual scores),
+        and data is assumed to be non-Normal (skewed), 
+        Assummptions:
+        - continuous variables
+        - non-Normal data, but similar in shape between groups
+        - independent groups
+        - Sufficient sample size (usually more than 5)
+        '''
 
         # Calculate mann-whitney test between each combination of groups.
         # Calculate the Mann-Whitney U test
@@ -565,23 +694,29 @@ class GradingDashboard:
                     mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<b>X</b>'
 
                     continue
+                else:
+                    mannwhitney_pvals_signif[a_i, b_i] = 0.73
+
 
                 if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
                     if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
                         print(self.all_avgscores[a_i])
                         print(self.all_avgscores[b_i])
                         u_stat, p_value_mw = sts.mannwhitneyu(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
                         #stat, p_value_w = sts.wilcoxon(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
                         mannwhitney_ustats[a_i, b_i] = u_stat
                         mannwhitney_pvals[a_i, b_i] = p_value_mw
-                        if p_value_mw < 0.05:
+                        if a_i == 3 or b_i == 3:
+                            print(p_value_mw)
+                            print(p_value_mw == 0)
+                        if p_value_mw < 0.05 and not p_value_mw == 0:
                             mannwhitney_pvals_signif[a_i, b_i] = 0.1
                             mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.05'
                         elif p_value_mw < 0.1:
                             mannwhitney_pvals_signif[a_i, b_i] = 0.25
                             mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.1'
-                        else:
-                            mannwhitney_pvals_signif[a_i, b_i] = 0.73
+
                         #wilcoxon_data[a_i, b_i] = stat
 
         print(mannwhitney_ustats)
@@ -594,7 +729,8 @@ class GradingDashboard:
                                         y=list(reversed(self.section_names)), 
                                         hoverongaps=False))
         
-        fig.update_layout(plot_bgcolor='white')
+        fig.update_layout(plot_bgcolor='white',
+                          title="U-statistic from Mann-Whitney tests")
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
 
@@ -609,7 +745,8 @@ class GradingDashboard:
                                         y=list(reversed(self.section_names)), 
                                         hoverongaps=False))
         
-        fig.update_layout(plot_bgcolor='white')
+        fig.update_layout(plot_bgcolor='white',
+                          title="p-values from Mann-Whitney tests")
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
 
@@ -641,6 +778,69 @@ class GradingDashboard:
 
         self.figures.append(fig)
 
+    def prob_of_superiority_grid(self) -> None:
+        '''
+        Mann-Whitney tests whether two groups are different or not (come from the same distribution)
+        Variables are assumed to be continuous (so student averages, not individual scores),
+        and data is assumed to be non-Normal (skewed), 
+        Assummptions:
+        - continuous variables
+        - non-Normal data, but similar in shape between groups
+        - independent groups
+        - Sufficient sample size (usually more than 5)
+        '''
+
+        # Calculate mann-whitney test between each combination of groups.
+        # Calculate the Mann-Whitney U test
+        # null hypothesis is that the prob of X > Y equals prob of Y > X
+        prob_superiority = np.zeros((len(self.section_names), len(self.section_names)))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    prob_superiority[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    prob_superiority[a_i, b_i] = 0.5
+                    continue
+
+
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+                        print(self.all_avgscores[a_i])
+                        print(self.all_avgscores[b_i])
+                        
+                        # Total number of pairings
+                        tot_pairs = len(self.all_avgscores[a_i]) * len(self.all_avgscores[b_i])
+
+                        # How many of those pairs is A superior
+                        sup_count = 0
+                        for a_val in self.all_avgscores[a_i]:
+                            for b_val in self.all_avgscores[b_i]:
+                                if a_val > b_val:
+                                    sup_count += 1
+
+                        prob_superiority[a_i, b_i] = sup_count / tot_pairs
+                        
+
+
+        print(prob_superiority)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        prob_superiority = np.transpose(np.array(prob_superiority))
+        prob_superiority = [list(row) for row in reversed(prob_superiority)]
+        fig = go.Figure(data=go.Heatmap(z=prob_superiority,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="Probability of superiority between each group")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+        
+        self.figures.append(fig)
+    
     def section_avg_scores(self, section_id: int) -> list:
         ''' Returns a list with the average score of each student for this section '''
         
@@ -1154,6 +1354,8 @@ class GradingDashboard:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
         self.mann_whitney_grid()
+        self.prob_of_superiority_grid()
+        self.t_test_grid()
         self.ANOVA_test(False)
         self.progress_table()
         self.LO_progress_table()
@@ -1172,6 +1374,7 @@ class GradingDashboard:
             self.LO_stackedbar_plot(lo_name)
 
         self.section_id_table()
+        self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
 
@@ -1226,8 +1429,9 @@ def create_data(file_name:str, total_scores:int):
 
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 22)
-gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6)
+new_data_name = create_data('fake_data_986100.py', 200)
+student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
+gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6, student_count=student_count)
 
 
 gd.make_full_report()
