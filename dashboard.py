@@ -160,12 +160,6 @@ class GradingDashboard:
             scores_colorscale
             score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
 
-        # Manually set colors in table to display them, remove this later
-        #score_color_indices[0] = 0
-        #score_color_indices[1] = 1
-        #score_color_indices[2] = 2
-        #score_color_indices[3] = 3
-        #score_color_indices[4] = 4
 
         redblue_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
 
@@ -400,7 +394,7 @@ class GradingDashboard:
 
         for i in range(len(self.section_names)):
             if signif_count[i] == 0:
-                cohens_d_vals[i] = 0
+                cohens_d_vals[i] = np.nan
             else:
                 cohens_d_vals[i] = round(cohens_d_vals[i] / signif_count[i], 2)
 
@@ -555,7 +549,7 @@ class GradingDashboard:
         
         self.figures.append(fig)
 
-    def t_test_grid(self) -> None:
+    def t_test_grids(self) -> None:
         '''
         Normal difference of means test, assumes normality of data 
         Assummptions:
@@ -638,11 +632,39 @@ class GradingDashboard:
 
         self.figures.append(fig)
 
+        # Coordinates to highlight
+        highlight_coords = []
+        print(t_test_pvals_text)
+        for a_i in range(len(self.section_names)-1):
+            for b_i in range(len(self.section_names)-a_i-1):
+                if float(t_test_pvals_text[a_i][b_i]) < 0.05:
+                    highlight_coords.append((self.section_names[b_i], self.section_names[len(self.section_names)-a_i-1]))
+        highlight_coords = [val for val in highlight_coords for _ in range(2)]
+
+        # Scatter trace for highlighting
+        highlight_scatter = go.Scatter(
+            x=[x for x, _ in highlight_coords],
+            y=[y for _, y in highlight_coords],
+            mode='markers',
+            marker=dict(
+                size=14,  # Adjust the size as needed
+                symbol='triangle-up',
+                line=dict(
+                    color='black',
+                    width=1.5
+                ),
+                color='rgba(255,255,255,1)',  # Fully transparent fill
+                angle=[270, 90] * len(highlight_coords),
+                standoff=26 # 20 for arrow-wide
+            ),
+            showlegend=False,
+            hoverinfo='skip'
+        )
 
         # Do some flipping around so that it becomes a lower triangle down-left
         cohens_d_vals = np.transpose(np.array(cohens_d_vals))
         cohens_d_vals = [list(row) for row in reversed(cohens_d_vals)]
-        fig = go.Figure(data=go.Heatmap(z=cohens_d_vals,
+        fig = go.Heatmap(z=cohens_d_vals,
                                         zmax=1,
                                         zmin=-1,
                                         x=self.section_names,
@@ -650,15 +672,18 @@ class GradingDashboard:
                                         customdata=cohens_d_vals,
                                         text=cohens_d_text,
                                         name='',
-                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.2f}',
                                         texttemplate="%{text}",
                                         hoverongaps=False,
-                                        colorscale='RdBu'))
+                                        colorscale='RdBu')
+        
+        fig = go.Figure(data=[fig, highlight_scatter])
         
         fig.update_layout(plot_bgcolor='white',
                           title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are")
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
+
 
         self.figures.append(fig)
 
@@ -1358,7 +1383,7 @@ class GradingDashboard:
 
         #self.mann_whitney_grid()
         #self.prob_of_superiority_grid()
-        self.t_test_grid()
+        self.t_test_grids()
         self.ANOVA_test(False)
         self.progress_table()
         self.LO_progress_table()
@@ -1428,7 +1453,6 @@ def create_data(file_name:str, total_scores:int):
     with open(new_file_name, 'w', encoding='utf8') as file:
         file.write(str(new_dict))
         
-
     return new_file_name
 
 new_data_name = create_data('fake_data_986100.py', 200)
