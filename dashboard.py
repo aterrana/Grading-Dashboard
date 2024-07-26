@@ -122,7 +122,6 @@ class GradingDashboard:
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
     
-
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
 
@@ -403,6 +402,7 @@ class GradingDashboard:
         # Create colorscales
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
+        reds_colorscale = sample_colorscale('Reds', list(np.linspace(0, 1, 101)))
 
         # If all means are equal
         if max(self.section_means)-min(self.section_means) == 0 or np.isnan(max(self.section_means)) or np.isnan(min(self.section_means)):
@@ -431,16 +431,16 @@ class GradingDashboard:
         
         # precalc the min and max according to absolute value of effect size
         cohens_d_numbers = [0 if np.isnan(val) else val for val in cohens_d_vals]
-        min_abs_effect = min([abs(val) for val in cohens_d_numbers]) 
+        min_abs_effect = min([abs(val) for val in cohens_d_numbers if val != 0])
         max_abs_effect = max([abs(val) for val in cohens_d_numbers])
 
         #only_number_effect = [val for val in effect_sizes if isinstance(val, float) or isinstance(val, int)]
         # If all effect sizes are equal
         if max_abs_effect - min_abs_effect == 0 or math.isinf(max_abs_effect):
-            effect_color_indices = [10] * len(cohens_d_vals)
+            effect_color_indices = [0] * len(cohens_d_vals)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
-            effect_color_indices = [int(10+40*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in cohens_d_numbers]
+            effect_color_indices = [int(10+60*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) if val != 0 else 0 for val in cohens_d_numbers]
 
 
         # precalc the min and max according to absolute value of effect size
@@ -449,10 +449,10 @@ class GradingDashboard:
 
         # If all effect sizes are equal
         if max_signif_count - min_signif_count == 0:
-            signif_count_color_indices = [10] * len(signif_count)
+            signif_count_color_indices = [0] * len(signif_count)
         else:
             # Convert nan to 0's for color indices
-            signif_count_color_indices = [int(10+40*(abs(val)-min_signif_count)/(max_signif_count-min_signif_count)) for val in signif_count]
+            signif_count_color_indices = [int(60*(abs(val)-min_signif_count)/(max_signif_count-min_signif_count)) for val in signif_count]
         
                 
         # Create table
@@ -499,8 +499,8 @@ class GradingDashboard:
                                                         this_table_section_colors,
                                                         mean_colors,
                                                         np.array(greys_colorscale)[sd_color_indices],
-                                                        np.array(greys_colorscale)[signif_count_color_indices],
-                                                        np.array(greys_colorscale)[effect_color_indices]
+                                                        np.array(reds_colorscale)[signif_count_color_indices],
+                                                        np.array(reds_colorscale)[effect_color_indices]
                                                     ],
                                                     height=30))])
         
@@ -511,8 +511,8 @@ class GradingDashboard:
         section_color_dict = {section_id:this_table_section_colors[i] for i, section_id in enumerate(data[0])}
         mean_color_dict = {section_id:mean_colors[i] for i, section_id in enumerate(data[0])}
         sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(data[0])}
-        p_color_dict = {section_id:np.array(greys_colorscale)[signif_count_color_indices][i] for i, section_id in enumerate(data[0])}
-        effect_color_dict = {section_id:greys_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
+        signf_count_dict = {section_id:reds_colorscale[signif_count_color_indices[i]] for i, section_id in enumerate(data[0])}
+        effect_color_dict = {section_id:reds_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
         
 
         # Create sorting drop-down menu
@@ -526,7 +526,7 @@ class GradingDashboard:
                                                 "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure colors are with correct cell
                                                         [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
                                                         [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
-                                                        [p_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [signf_count_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
                                                         [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]]
                                                         ]), 
                                                 "height": 30}},[0]]
@@ -634,7 +634,6 @@ class GradingDashboard:
 
         # Coordinates to highlight
         highlight_coords = []
-        print(t_test_pvals_text)
         for a_i in range(len(self.section_names)-1):
             for b_i in range(len(self.section_names)-a_i-1):
                 if float(t_test_pvals_text[a_i][b_i]) < 0.05:
@@ -1430,7 +1429,7 @@ def create_data(file_name:str, total_scores:int):
             for score_index in range(len(dict_all[section_ID][student_ID])):
                 all_scores_path.append((section_ID, student_ID, score_index))
         
-    rnd.seed(10)
+    rnd.seed(13) # 10
     chosen_scores = rnd.sample(all_scores_path, total_scores)
     #print(chosen_scores)
     new_dict = {}
@@ -1455,9 +1454,9 @@ def create_data(file_name:str, total_scores:int):
         
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 200)
+new_data_name = create_data('fake_data_986100.py', 250) # 170, 210
 student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
-gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6, student_count=student_count)
+gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6, student_count=student_count)
 
 
 gd.make_full_report()
