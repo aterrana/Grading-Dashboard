@@ -473,7 +473,7 @@ class GradingDashboard:
 
         data[2].insert(0, '<b>' + str(round(overall_SD, 3)) + '</b>')
         sd_color_indices.insert(0, 0)
-        data[3].insert(0, '<b>' + str(round(np.mean(signif_count), 2)) + '</b>')
+        data[3].insert(0, '<b>NA</b>')
         signif_count_color_indices.insert(0, 0)
         data[4].insert(0, '<b>NA</b>')
         effect_color_indices.insert(0, 0)
