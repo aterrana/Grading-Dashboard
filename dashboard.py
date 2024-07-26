@@ -4,6 +4,7 @@ from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
 import plotly.express as px
 import plotly.graph_objects as go
+from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats as sts
 import random as rnd
 import numpy as np
@@ -401,6 +402,28 @@ class GradingDashboard:
 
         # Create colorscales
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
+
+        colors = [
+            (0, 'red'),     # At 1, color is red
+            (25, 'orange'), # At 25, color is orange
+            (50, 'green'),  # At 50, color is green
+            (75, 'blue'),   # At 75, color is blue
+            (100, 'purple') # At 100, color is purple
+        ]
+
+        # Normalize the position values to be between 0 and 1
+        colors_normalized = [(pos/100.0, color) for pos, color in colors]
+
+        # Create the custom colormap
+        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)
+
+        # Create an array of 100 values ranging from 0 to 1
+        values = np.linspace(0, 1, 100)
+
+        # Create an array to store the RGB values of the colorscale
+        redblue_colorscale = cmap(values)
+        redblue_colorscale = ["rgba(" + str(int(255*val[0])) + ',' + str(int(255*val[1])) + ',' + str(int(255*val[2])) + ",0.6)" for val in redblue_colorscale]
+
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
         reds_colorscale = sample_colorscale('Reds', list(np.linspace(0, 1, 101)))
 
@@ -415,7 +438,7 @@ class GradingDashboard:
                 if np.isnan(mean_val):
                     mean_color_indices.append(50)
                 else:
-                    mean_color_indices.append(int(15+70*(mean_val-min(self.section_means))/(max(self.section_means)-min(self.section_means))))
+                    mean_color_indices.append(int(25*(mean_val-1)))
         # If all SDs are equal
         if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
             # Set all colors to the middle point
@@ -1454,12 +1477,13 @@ def create_data(file_name:str, total_scores:int):
         
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 250) # 170, 210
+new_data_name = create_data('fake_data_986100.py', 170) # 170, 210
 student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
 gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6, student_count=student_count)
 
 
 gd.make_full_report()
+
 
 import os
 os.system("start file:///C:/Users/gabri/Desktop/Grading%20Dashboard/grading_dashboard.html")
