@@ -1165,6 +1165,135 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
+    def boxplots_new(self, averages=True) -> None:
+        ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
+
+        # Whether considering student average scores, or all individual LO/HC scores
+        # Deepcopy because we will edit local copy.
+        if averages:
+            scores = copy.deepcopy(self.all_avgscores)
+        else:
+            scores = copy.deepcopy(self.all_scores)
+
+        fig = go.Figure()
+
+        # Flatten scores list for plotting
+        for section_scores in scores:
+            # We need 5 datapoints for the mean and SD plotting to work
+            # So if fewer, add None to make the difference
+            if len(section_scores) < 5:
+                diff = 5 - len(section_scores)
+                section_scores.extend([None] * diff)
+
+        # Flatten the scores, now including None
+        flat_scores = [score for lst in scores for score in lst]
+        
+
+        # x_mapping describes which datapoint belongs to which section
+        x_mapping = []
+        for i, section_name in enumerate(self.section_names):
+            x_mapping.extend([section_name] * len(scores[i]))
+
+        
+        # Boxplot for scores, displaying quartiles
+        #fig.add_trace(go.Box(
+        #    y=flat_scores,
+        #    x=x_mapping,
+        #    name='4 Quartiles',
+        #    quartilemethod="inclusive",
+        #    fillcolor=self.section_colors[i],
+        #    line=dict(color='black') # self.section_colors
+        #))
+
+        # For a given section in this list,
+        # All datapoints will be at the mean except
+        # 2 datapoints which will be +1 and -1 SD.
+        means_and_SDs = []
+
+        # calcuate means and SDs
+        for section_scores in scores:
+            filtered_list = [score for score in section_scores if score is not None]
+            # If there's any scores in this section
+            this_mean_and_SD = []
+            if len(filtered_list) > 0:
+                mean = np.mean(filtered_list)
+                std_dev = np.std(filtered_list)
+                this_mean_and_SD.append(mean-std_dev)
+                this_mean_and_SD.append(mean+std_dev)
+
+                # Fill the rest of the section with the mean
+                remaining_count = len(section_scores) - 2
+                this_mean_and_SD.extend([mean] * remaining_count)
+            # There are no scores in this section yet
+            else:
+                this_mean_and_SD.extend([None]*5)
+            means_and_SDs.append(this_mean_and_SD)
+
+        tickvals_list = []
+        ticktext_list = []
+        for i, group in enumerate(self.section_names):
+            lst = [y_val for y_val, x_val in zip(flat_scores, x_mapping) if x_val == group]
+            x_lst = [[group] * len(scores[i]),['4 Quartiles'] * len(scores[i])]
+            fig.add_trace(go.Box(
+                y=scores[i],
+                #x=[i-0.2] * len(lst),
+                name=group,
+                marker_color=self.section_colors[i],
+                #name='4 Quartiles',
+                legendgroup=group,
+                #legendgroup='4 Quartiles',
+                #legendgrouptitle_text=group,
+                quartilemethod="inclusive",
+                showlegend = True
+            ))
+
+            tickvals_list.append(group)
+            ticktext_list.append(group)
+
+            # Boxplot only displaying mean and SDs
+            fig.add_trace(go.Box(
+                y=means_and_SDs[i],
+                #x=x_lst,
+                #x=[i+0.2] * len(lst),
+                name=group + '+',
+                #name='Mean & ±1 SD',
+                #legendgroup='Mean & ±1 SD',
+                legendgroup=group,
+                line_width=2.5,
+                whiskerwidth=1,
+                #legendgrouptitle_text=group,
+                marker_color=self.section_colors[i],
+                quartilemethod="inclusive",
+                boxpoints=False,
+                showlegend = False
+            )) 
+
+            tickvals_list.append(group+'+')
+            ticktext_list.append('')
+
+
+        fig.update_layout(
+            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplots are quartiles, black lines are mean +- 1 SD',
+            xaxis_title='Section',
+            yaxis_title='Scores',
+            height=800,
+            legend=dict(groupclick="togglegroup"),
+            #boxmode='group'
+            xaxis=dict(
+                tickvals=tickvals_list,
+                ticktext=ticktext_list
+            )
+        )
+
+
+        with open('only_boxplot.html', 'a') as f:
+            # Remove contents
+            f.truncate(0)
+            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+
+        # Add plot to the report
+        self.figures.append(fig)
+
     # Not used currently
     def violinplots(self, averages=True) -> None:
         ''' Creates side by side violinplots '''
@@ -1416,7 +1545,7 @@ class GradingDashboard:
         self.scoreavgs_allsections_plot()
         self.figures.append("- Click and drag inside the plot to zoom in, double click to reset<br>")
         self.figures.append("- Click the legend on the right to select and deselect different sections")
-        self.boxplots()
+        self.boxplots_new()
         # Skip the violinplots (kde)
         # self.violinplots()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
@@ -1429,7 +1558,6 @@ class GradingDashboard:
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
-import json
 # Create new file with only portions of fake_data
 def create_data(file_name:str, total_scores:int):
 
@@ -1481,11 +1609,115 @@ def create_data(file_name:str, total_scores:int):
 
 new_data_name = create_data('fake_data_986100.py', 170) # 170, 210
 student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
-gd = GradingDashboard(new_data_name, anonymize=False, target_scorecount=6, student_count=student_count)
+gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6, student_count=student_count)
 
 
 gd.make_full_report()
 
+data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+data1b = [val+1 for val in data1]
+data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+data2b = [val+1 for val in data2]
+data3 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+data3b = [val+1 for val in data3]
+
+trace1 = go.Box(y=data1, name='1', legendgroup='1')
+trace1b = go.Box(y=data1b, name='2', legendgroup='1', showlegend=False)
+trace2 = go.Box(y=data2, name='4', legendgroup='2')
+trace2b = go.Box(y=data2b, name='5', legendgroup='2', showlegend=False)
+trace3 = go.Box(y=data3, name='6', legendgroup='3')
+trace3b = go.Box(y=data3b, name='7', legendgroup='3', showlegend=False)
+
+# Combine the traces into a data list
+data = [trace1, trace1b, trace2, trace2b, trace3, trace3b]
+
+# Define the layout
+layout = go.Layout(
+    title='Multiple Box Plots',
+    xaxis=dict(
+        title='Category',
+        #tickvals=[1, 2, 3, 4, 5, 6],
+        ticktext=['A', 'Ab', 'B', 'Bb', 'C', 'Cb']
+    ),
+    yaxis=dict(
+        title='Values'
+    )
+)
+
+# Create the figure
+fig = go.Figure(data=data, layout=layout)
+
+#fig.show()
+
+# Sample data
+data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+data3 = [1, 9, 2, 3, 8, 2, 3, 9, 12, 11]
+data4 = [val + 3 for val in data1]
+data5 = [val + 2 for val in data1]
+data6 = [val - 1.5 for val in data1]
+
+# Create traces for each dataset with specific x positions
+trace1 = go.Box(y=data1, name='Data 1', x=[1] * len(data1))
+trace2 = go.Box(y=data2, name='Data 2', x=[2] * len(data2))
+trace3 = go.Box(y=data3, name='Data 3', x=[4] * len(data3))
+trace4 = go.Box(y=data4, name='Data 4', x=[5] * len(data4))
+trace5 = go.Box(y=data5, name='Data 5', x=[7] * len(data5))
+trace6 = go.Box(y=data6, name='Data 6', x=[8] * len(data6))
+
+# Combine the traces into a data list
+data = [trace1, trace2, trace3, trace4, trace5, trace6]
+
+# Define the layout
+layout = go.Layout(
+    title='Box Plots at Specific X Positions',
+    xaxis=dict(
+        title='X Position',
+        tickvals=[1, 2, 4, 5, 7, 8],
+        ticktext=['A', 'Ab', 'B', 'Bb', 'C', 'Cb']
+    ),
+    yaxis=dict(
+        title='Values'
+    )
+)
+
+# Create the figure
+fig = go.Figure(data=data, layout=layout)
+
+#fig.show()
+
+import plotly.graph_objs as go
+import plotly.offline as pyo
+
+# Sample data
+data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
+# Create traces for each dataset with a slight offset in x positions
+trace1 = go.Box(y=data1, name='Category 1', x=[0.95 for _ in data1], marker=dict(color='blue'))
+trace2 = go.Box(y=data2, name='Category 1', x=[1.05 for _ in data2], marker=dict(color='orange'))
+
+# Combine the traces into a data list
+data = [trace1, trace2]
+
+# Define the layout
+layout = go.Layout(
+    title='Box Plots with Manual Shifts',
+    xaxis=dict(
+        title='Category',
+        tickvals=[1],
+        ticktext=['Category 1']
+    ),
+    yaxis=dict(
+        title='Values'
+    )
+)
+
+# Create the figure
+fig = go.Figure(data=data, layout=layout)
+
+# Plot the figure
+#fig.show()
 
 import os
 os.system("start file:///C:/Users/gabri/Desktop/Grading%20Dashboard/grading_dashboard.html")
