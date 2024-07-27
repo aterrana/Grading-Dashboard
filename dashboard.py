@@ -989,6 +989,8 @@ class GradingDashboard:
             xaxis_title='Score',
             yaxis_title='Count')
         
+        fig.update_xaxes(dtick=0.2)
+        
         # Add plot to the report
         self.figures.append(fig)
 
