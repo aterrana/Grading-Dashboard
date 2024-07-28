@@ -1229,20 +1229,15 @@ class GradingDashboard:
                 this_mean_and_SD.extend([None]*5)
             means_and_SDs.append(this_mean_and_SD)
 
+
         tickvals_list = []
         ticktext_list = []
         for i, group in enumerate(self.section_names):
-            lst = [y_val for y_val, x_val in zip(flat_scores, x_mapping) if x_val == group]
-            x_lst = [[group] * len(scores[i]),['4 Quartiles'] * len(scores[i])]
             fig.add_trace(go.Box(
                 y=scores[i],
-                #x=[i-0.2] * len(lst),
                 name=group,
                 marker_color=self.section_colors[i],
-                #name='4 Quartiles',
                 legendgroup=group,
-                #legendgroup='4 Quartiles',
-                #legendgrouptitle_text=group,
                 quartilemethod="inclusive",
                 showlegend = True
             ))
@@ -1265,8 +1260,35 @@ class GradingDashboard:
                 marker_color=self.section_colors[i],
                 quartilemethod="inclusive",
                 boxpoints=False,
-                showlegend = False
-            )) 
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Add a transparent scatterplot over the mean & SD boxplot to fix hover text
+            fig.add_trace(go.Scatter(
+                y=[max(means_and_SDs[i])],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean + 1sd: %{y:.2f}<extra></extra>'
+            ))
+            fig.add_trace(go.Scatter(
+                y=[means_and_SDs[i][-1]],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean: %{y:.2f}<extra></extra>'
+            ))
+            fig.add_trace(go.Scatter(
+                y=[min(means_and_SDs[i])],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean - 1sd: %{y:.2f}<extra></extra>'
+            ))
 
             tickvals_list.append(group+'+')
             ticktext_list.append('')
@@ -1282,7 +1304,8 @@ class GradingDashboard:
             xaxis=dict(
                 tickvals=tickvals_list,
                 ticktext=ticktext_list
-            )
+            ),
+            hovermode='x'
         )
 
 
