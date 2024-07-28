@@ -157,7 +157,6 @@ class GradingDashboard:
         else:
             num_colors = 5
             scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
-            scores_colorscale
             score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
 
 
@@ -232,9 +231,12 @@ class GradingDashboard:
                 height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
         
-        self.figures.append('<center><h1>Grading progress</h1></center>')
+        self.figures.append('<center><h2>Grading progress summary</h2></center>')
+        self.figures.append("This table summarizes the grading progress for each section.<br>")
+        self.figures.append(f'The "scores per student" column will be colored more and more green as the value approaches the target number of scores per student, which for this assignment has been set to {self.target_scorecount}.<br>')
+        self.figures.append("<br>Try out sorting each column using the dropdown menu to the right.<br>")
         self.figures.append("<i>The key associating each section ('Section C') with it's Forum section ID ('16193482') is found at the bottom of the report</i>")
-        
+
         self.figures.append(fig)
 
     def LO_progress_table(self) -> None:
@@ -249,15 +251,6 @@ class GradingDashboard:
                         if submission_data['learning_outcome'] == lo_name:
                             lo_scores_counts[lo_index][section_index] += 1
 
-        # Setup colors for score count
-        #if self.target_scorecount is None:
-        #    scores_colorscale = ['lightblue']
-        #    score_color_indices = [0] * len(scores_counts)
-        #else:
-        #    num_colors = 5
-        #    scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
-        #    scores_colorscale
-        #    score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
 
         # Calculate total number of scores per section
         total_scores_given = np.array(lo_scores_counts[0])
@@ -288,10 +281,16 @@ class GradingDashboard:
         data.extend(lo_scores_counts)
 
         column_names = ['Section name', 'Total scores assigned']
-        column_names.extend(['Score count in ' + lo_name for lo_name in self.sorted_LOs])
+        for lo_name in self.sorted_LOs:
+            # I set this to False now because it looks bad if you make the html window wide,
+            # but leaving logic here if I want to use it later
+            if len(lo_name) > 8 and False:
+                column_names.append('Score count in ' + lo_name[:7] + '- ' + lo_name[7:])
+            else:
+                column_names.append('Score count in ' + lo_name)
         
         column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
-        tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
+        #tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
         
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
         
@@ -306,12 +305,8 @@ class GradingDashboard:
 
         # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
         section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
-        #total_scores_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
-        #print("column colors length:")
-        #print(len(column_colors))
-        #for color_lst in column_colors:
-        #    print(color_lst)
-        score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
+
+        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
         total_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
 
         lo_color_dicts = [{section_id:column_colors[lo_name_i+2][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(self.sorted_LOs))]
@@ -345,8 +340,8 @@ class GradingDashboard:
                 height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
         
-        self.figures.append('<center><h1>LO grading progress</h1></center>')
-        self.figures.append('<center><i>work in progress, this table will be prettier</i></center>')
+        self.figures.append('<center><h2>LO grading progress</h2></center>')
+        self.figures.append('This table show how many scores each section has given, in total and for each LO')
         
         self.figures.append(fig)
 
@@ -515,7 +510,7 @@ class GradingDashboard:
                                                     ['Section name', 
                                                      'Mean score',
                                                      'Standard Deviation',
-                                                     'Count of significant comparisons',
+                                                     'Count of significant tests',
                                                      'Avg effect size among significant']),
                                         cells=dict(values=data,
                                                     fill_color=[
@@ -564,11 +559,14 @@ class GradingDashboard:
                     y = 1.15,
                     x = 1
                 )],
-                height=450+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
                 font_size=15)
 
-        self.figures.append('<center><h1>Summary statistics</h1></center>')
-        self.figures.append('p-values and effect size are from a difference of means test, <br>comparing each section with the "average" section. <br>This calculation is currently quite basic and will be improved.')
+        self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
+        self.figures.append('This table summarizes the information from pairwise t-tests between each section. The detailed information of each t-test can be found below this table.<br>')
+        self.figures.append('The "Count of significant tests" describes how many other sections this specific section is different from, with statistical significance.<br>')
+        self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
+        self.figures.append('The final column "Avg effect size among significant" displays the average cohen\'s d among all significant tests, so the average number of standard deviations the means are in all significant tests.<br>')
         
         self.figures.append(fig)
 
@@ -648,7 +646,7 @@ class GradingDashboard:
                                         colorscale='RdBu'))
         
         fig.update_layout(plot_bgcolor='white',
-                          title="<b>p-values from T tests</b>")
+                          title="<b>p-values from T tests</b><br>Significant tests (p<.05) is colored in red")
         fig.update_traces(showscale=False)
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
@@ -702,10 +700,9 @@ class GradingDashboard:
         fig = go.Figure(data=[fig, highlight_scatter])
         
         fig.update_layout(plot_bgcolor='white',
-                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are")
+                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are.<br>Positive values mean that y-axis section has larger mean than x-axis section.")
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
-
 
         self.figures.append(fig)
 
@@ -985,7 +982,7 @@ class GradingDashboard:
         # Count total number of students
         student_count_tot = len([student_id for section in self.dict_all.keys() for student_id in self.dict_all[section].keys() ]) 
         fig.update_layout(
-            title=f'Score distribution across all sections ({len(self.section_ids)} sections, {student_count_tot} students)',
+            title=f'<b>Student score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} students)',
             xaxis_title='Score',
             yaxis_title='Count')
         
@@ -1012,16 +1009,17 @@ class GradingDashboard:
                 if not np.isnan(sublist[0][0]):
                     filtered_scores.append([val for lst in sublist for val in lst])
 
-
             f_stat, p_value = sts.f_oneway(*filtered_scores)
             #f_stat, p_value = f_stat[0], p_value[0]
             if np.isnan(f_stat) or np.isnan(p_value):
                 raise Exception("Not enough data")
 
             output = ''
+            
             # Display the results
             # Small p-value means statistically significant
-            output += "<center><h1> ANOVA Results</h1></center>"
+            output += "<center><h2> ANOVA Results (global significance test)</h2></center>"
+            output += "ANOVA is a difference of means test for multiple groups. It gives a global p-value, which if significant, means that it's likely that a students average score is effected by the students section, in general.<br>"
             output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
             output += "(With significance level = 0.05)<br>"
             if p_value < 0.05:
@@ -1185,26 +1183,6 @@ class GradingDashboard:
                 diff = 5 - len(section_scores)
                 section_scores.extend([None] * diff)
 
-        # Flatten the scores, now including None
-        flat_scores = [score for lst in scores for score in lst]
-        
-
-        # x_mapping describes which datapoint belongs to which section
-        x_mapping = []
-        for i, section_name in enumerate(self.section_names):
-            x_mapping.extend([section_name] * len(scores[i]))
-
-        
-        # Boxplot for scores, displaying quartiles
-        #fig.add_trace(go.Box(
-        #    y=flat_scores,
-        #    x=x_mapping,
-        #    name='4 Quartiles',
-        #    quartilemethod="inclusive",
-        #    fillcolor=self.section_colors[i],
-        #    line=dict(color='black') # self.section_colors
-        #))
-
         # For a given section in this list,
         # All datapoints will be at the mean except
         # 2 datapoints which will be +1 and -1 SD.
@@ -1248,15 +1226,10 @@ class GradingDashboard:
             # Boxplot only displaying mean and SDs
             fig.add_trace(go.Box(
                 y=means_and_SDs[i],
-                #x=x_lst,
-                #x=[i+0.2] * len(lst),
                 name=group + '+',
-                #name='Mean & ±1 SD',
-                #legendgroup='Mean & ±1 SD',
                 legendgroup=group,
                 line_width=2.5,
                 whiskerwidth=1,
-                #legendgrouptitle_text=group,
                 marker_color=self.section_colors[i],
                 quartilemethod="inclusive",
                 boxpoints=False,
@@ -1295,12 +1268,11 @@ class GradingDashboard:
 
 
         fig.update_layout(
-            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplots are quartiles, black lines are mean +- 1 SD',
+            title='<b>Student score averages</b>, per section<br>Box plots are quartiles<br>adjacent whiskerplots are mean +/- 1sd',
             xaxis_title='Section',
             yaxis_title='Scores',
             height=800,
             legend=dict(groupclick="togglegroup"),
-            #boxmode='group'
             xaxis=dict(
                 tickvals=tickvals_list,
                 ticktext=ticktext_list
@@ -1559,15 +1531,20 @@ class GradingDashboard:
 
         #self.mann_whitney_grid()
         #self.prob_of_superiority_grid()
-        self.t_test_grids()
-        self.ANOVA_test(False)
+        self.figures.append("<center><h1>Progress</h1></center>")
+        self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
         self.progress_table()
         self.LO_progress_table()
+        self.figures.append("<center><h1>Significance tests</h1></center>")
+        self.figures.append("This section will describe the comparisons between sections and their practical and statistical significance.<br>")
+        self.figures.append("For all tests, independence and normality is assumed.<br>")
+        self.ANOVA_test(False)
         self.summary_stats_table()
-        self.figures.append("<center><h1>Student average score distributions</h1></center>")
+        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
+        self.t_test_grids()
+        self.figures.append("<center><h1>Score distributions</h1></center>")
         self.scoreavgs_allsections_plot()
-        self.figures.append("- Click and drag inside the plot to zoom in, double click to reset<br>")
-        self.figures.append("- Click the legend on the right to select and deselect different sections")
+        self.figures.append("<b>- Click or double click the legend on the right to select and deselect different sections</b>")
         self.boxplots_new()
         # Skip the violinplots (kde)
         # self.violinplots()
@@ -1634,113 +1611,7 @@ new_data_name = create_data('fake_data_986100.py', 170) # 170, 210
 student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
 gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6, student_count=student_count)
 
-
 gd.make_full_report()
-
-data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-data1b = [val+1 for val in data1]
-data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-data2b = [val+1 for val in data2]
-data3 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-data3b = [val+1 for val in data3]
-
-trace1 = go.Box(y=data1, name='1', legendgroup='1')
-trace1b = go.Box(y=data1b, name='2', legendgroup='1', showlegend=False)
-trace2 = go.Box(y=data2, name='4', legendgroup='2')
-trace2b = go.Box(y=data2b, name='5', legendgroup='2', showlegend=False)
-trace3 = go.Box(y=data3, name='6', legendgroup='3')
-trace3b = go.Box(y=data3b, name='7', legendgroup='3', showlegend=False)
-
-# Combine the traces into a data list
-data = [trace1, trace1b, trace2, trace2b, trace3, trace3b]
-
-# Define the layout
-layout = go.Layout(
-    title='Multiple Box Plots',
-    xaxis=dict(
-        title='Category',
-        #tickvals=[1, 2, 3, 4, 5, 6],
-        ticktext=['A', 'Ab', 'B', 'Bb', 'C', 'Cb']
-    ),
-    yaxis=dict(
-        title='Values'
-    )
-)
-
-# Create the figure
-fig = go.Figure(data=data, layout=layout)
-
-#fig.show()
-
-# Sample data
-data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-data3 = [1, 9, 2, 3, 8, 2, 3, 9, 12, 11]
-data4 = [val + 3 for val in data1]
-data5 = [val + 2 for val in data1]
-data6 = [val - 1.5 for val in data1]
-
-# Create traces for each dataset with specific x positions
-trace1 = go.Box(y=data1, name='Data 1', x=[1] * len(data1))
-trace2 = go.Box(y=data2, name='Data 2', x=[2] * len(data2))
-trace3 = go.Box(y=data3, name='Data 3', x=[4] * len(data3))
-trace4 = go.Box(y=data4, name='Data 4', x=[5] * len(data4))
-trace5 = go.Box(y=data5, name='Data 5', x=[7] * len(data5))
-trace6 = go.Box(y=data6, name='Data 6', x=[8] * len(data6))
-
-# Combine the traces into a data list
-data = [trace1, trace2, trace3, trace4, trace5, trace6]
-
-# Define the layout
-layout = go.Layout(
-    title='Box Plots at Specific X Positions',
-    xaxis=dict(
-        title='X Position',
-        tickvals=[1, 2, 4, 5, 7, 8],
-        ticktext=['A', 'Ab', 'B', 'Bb', 'C', 'Cb']
-    ),
-    yaxis=dict(
-        title='Values'
-    )
-)
-
-# Create the figure
-fig = go.Figure(data=data, layout=layout)
-
-#fig.show()
-
-import plotly.graph_objs as go
-import plotly.offline as pyo
-
-# Sample data
-data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-data2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-
-# Create traces for each dataset with a slight offset in x positions
-trace1 = go.Box(y=data1, name='Category 1', x=[0.95 for _ in data1], marker=dict(color='blue'))
-trace2 = go.Box(y=data2, name='Category 1', x=[1.05 for _ in data2], marker=dict(color='orange'))
-
-# Combine the traces into a data list
-data = [trace1, trace2]
-
-# Define the layout
-layout = go.Layout(
-    title='Box Plots with Manual Shifts',
-    xaxis=dict(
-        title='Category',
-        tickvals=[1],
-        ticktext=['Category 1']
-    ),
-    yaxis=dict(
-        title='Values'
-    )
-)
-
-# Create the figure
-fig = go.Figure(data=data, layout=layout)
-
-# Plot the figure
-#fig.show()
 
 import os
 os.system("start file:///C:/Users/gabri/Desktop/Grading%20Dashboard/grading_dashboard.html")
