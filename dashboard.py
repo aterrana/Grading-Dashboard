@@ -2,7 +2,6 @@
 
 from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
-import plotly.express as px
 import plotly.graph_objects as go
 from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats as sts
@@ -11,7 +10,11 @@ import numpy as np
 import copy
 import math
 
+import os
+import pathlib
+
 import pandas as pd
+
 
 class GradingDashboard:
     '''
@@ -32,37 +35,40 @@ class GradingDashboard:
         # Read in data
 
         # Open the file
-        with open(file_name, 'r', encoding='utf8') as file:
+        with open(file_name, 'r', encoding='utf-8') as file:
             data = file.read()
 
         # Dangerous eval call, should also test for errors
         try:
-            dict_all_init = eval(data)
+            self.dict_all = eval(data)
         except:
-            raise Exception("text in file not properly formatted dictionary")
+            raise Exception("text in file is not a properly formatted dictionary")
         else:
             # Make it robust to errors here
             ...
 
+        grades_dict = self.dict_all["grades"]
+
         self.target_scorecount = target_scorecount
-        self.student_count = student_count
 
         # Keep track of section ids, average scores, LO names, globally
-        self.section_ids = list(dict_all_init.keys())
-
+        self.section_ids = list(grades_dict.keys())
+        
+        self.student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
+        
         if anonymize:
             # Shuffle key_order to anonymize report
-            key_order = list(dict_all_init.keys())
+            key_order = list(grades_dict.keys())
             rnd.shuffle(key_order)
-            self.dict_all = {k : dict_all_init[k] for k in key_order}
+            self.grades_dict = {k : grades_dict[k] for k in key_order}
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
-            self.dict_all = dict_all_init
+            self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
-        self.section_ids = list(self.dict_all.keys())
+        self.section_ids = list(self.grades_dict.keys())
 
         self.all_scores = []
         self.all_LOs = set()
@@ -71,10 +77,10 @@ class GradingDashboard:
         for section_id in self.section_ids:
             # A sublist for this section
             self.all_scores.append([])
-            for student_id in self.dict_all[section_id]:
+            for student_id in self.grades_dict[section_id]:
                 # A sublist for this student
                 self.all_scores[-1].append([])
-                for submission_data in self.dict_all[section_id][student_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['score'] != None:
                         # Add score for this specific student
                         self.all_scores[-1][-1].append(submission_data['score'])
@@ -135,9 +141,9 @@ class GradingDashboard:
             comment_counter = 0
             comment_wordcounter = 0
             student_count = 0
-            for student_id in self.dict_all[section_id].keys():
+            for student_id in self.grades_dict[section_id].keys():
                 student_count += 1
-                for submission_data in self.dict_all[section_id][student_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['score'] is not None:
                         score_counter += 1
                     if len(submission_data['comment']) > 1:
@@ -246,8 +252,8 @@ class GradingDashboard:
         lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.sorted_LOs))]
         for lo_index, lo_name in enumerate(self.sorted_LOs):
             for section_index, section_id in enumerate(self.section_ids):
-                for student_id in self.dict_all[section_id].keys():
-                    for submission_data in self.dict_all[section_id][student_id]:
+                for student_id in self.grades_dict[section_id].keys():
+                    for submission_data in self.grades_dict[section_id][student_id]:
                         if submission_data['learning_outcome'] == lo_name:
                             lo_scores_counts[lo_index][section_index] += 1
 
@@ -352,7 +358,7 @@ class GradingDashboard:
         self.section_SDs = np.array([np.std(section_avgs) if len(section_avgs) > 0 else np.nan for section_avgs in self.all_avgscores])
 
         # Number of students in each section
-        self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
+        self.section_sizes = np.array([len(self.grades_dict[section_id].keys()) for section_id in self.section_ids])
 
         # Overall average score and SDs, weighted by number of students. This defines the "average" section
         overall_mean = sum([val for val in (self.section_means * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
@@ -673,7 +679,7 @@ class GradingDashboard:
                     color='black',
                     width=1.5
                 ),
-                color='rgba(255,255,255,1)',  # Fully transparent fill
+                color='rgba(1,1,1,1)',  # Fully transparent fill
                 angle=[270, 90] * len(highlight_coords),
                 standoff=26 # 20 for arrow-wide
             ),
@@ -894,14 +900,14 @@ class GradingDashboard:
     def section_avg_scores(self, section_id: int) -> list:
         ''' Returns a list with the average score of each student for this section '''
         
-        student_ids = list(self.dict_all[section_id].keys())
+        student_ids = list(self.grades_dict[section_id].keys())
         avg_scores = []
 
         # For each student
         for this_student_id in student_ids:
             # Calculate average score
             student_scores = []
-            for score_data in self.dict_all[section_id][this_student_id]:
+            for score_data in self.grades_dict[section_id][this_student_id]:
                 # Excluded None
                 if score_data['score'] != None:
                     student_scores.append(score_data['score'])
@@ -980,7 +986,7 @@ class GradingDashboard:
         
         fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
         # Count total number of students
-        student_count_tot = len([student_id for section in self.dict_all.keys() for student_id in self.dict_all[section].keys() ]) 
+        student_count_tot = len([student_id for section in self.grades_dict.keys() for student_id in self.grades_dict[section].keys() ]) 
         fig.update_layout(
             title=f'<b>Student score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} students)',
             xaxis_title='Score',
@@ -1228,7 +1234,7 @@ class GradingDashboard:
                 y=means_and_SDs[i],
                 name=group + '+',
                 legendgroup=group,
-                line_width=2.5,
+                line_width=3,
                 whiskerwidth=1,
                 marker_color=self.section_colors[i],
                 quartilemethod="inclusive",
@@ -1324,8 +1330,8 @@ class GradingDashboard:
         score_count = 0
         for section_id in self.section_ids:
             LO_scores.append([])
-            for student_id in self.dict_all[section_id]:
-                for submission_data in self.dict_all[section_id][student_id]:
+            for student_id in self.grades_dict[section_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         score_count += 1
                         LO_scores[-1].append(submission_data['score'])
@@ -1368,8 +1374,8 @@ class GradingDashboard:
         for section_id in self.section_ids:
             # Add 5 counters for the 5 possible scores
             LO_scores_count.append(np.zeros(5))
-            for student_id in self.dict_all[section_id]:
-                for submission_data in self.dict_all[section_id][student_id]:
+            for student_id in self.grades_dict[section_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
                         LO_scores_count[-1][int(submission_data['score'])-1] += 1
@@ -1415,8 +1421,8 @@ class GradingDashboard:
             LO_scores_count.append(np.zeros(5))
             for section_id in self.section_ids:
                 # Add 5 counters for the 5 possible scores
-                for student_id in self.dict_all[section_id]:
-                    for submission_data in self.dict_all[section_id][student_id]:
+                for student_id in self.grades_dict[section_id]:
+                    for submission_data in self.grades_dict[section_id][student_id]:
                         if submission_data['learning_outcome'] == LO_name:
                             # Increment the the counter corresponding to the score
                             LO_scores_count[-1][int(submission_data['score'])-1] += 1
@@ -1460,10 +1466,14 @@ class GradingDashboard:
     def section_id_table(self) -> None:
         ''' Add a small table associated anonymous labels of sections to their true section ID '''
 
+        print(self.section_ids)
+        print(self.dict_all.keys())
+        section_names = [self.dict_all['sections'][id]['title'] for id in self.section_ids]
+
         fig = go.Figure(data=[go.Table(header=dict(values=
-                                                    ['Section Name', 
-                                                     'Section ID']),
-                                        cells=dict(values=[self.section_names, self.section_ids],
+                                                    ['Section Name in Report', 
+                                                     'Section Title']),
+                                        cells=dict(values=[self.section_names, section_names],
                                                     fill_color=[
                                                         self.table_section_colors
                                                     ],
@@ -1517,8 +1527,8 @@ class GradingDashboard:
         for lo_name in self.all_LOs:
             score_count = 0
             for section_id in self.section_ids:
-                for student_id in self.dict_all[section_id]:
-                    for submission_data in self.dict_all[section_id][student_id]:
+                for student_id in self.grades_dict[section_id]:
+                    for submission_data in self.grades_dict[section_id][student_id]:
                         if submission_data['learning_outcome'] == lo_name:
                             score_count += 1
             lo_score_counts.append(score_count)
@@ -1546,8 +1556,6 @@ class GradingDashboard:
         self.scoreavgs_allsections_plot()
         self.figures.append("<b>- Click or double click the legend on the right to select and deselect different sections</b>")
         self.boxplots_new()
-        # Skip the violinplots (kde)
-        # self.violinplots()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
         self.LO_stackedbar_plot_all()
@@ -1607,11 +1615,12 @@ def create_data(file_name:str, total_scores:int):
         
     return new_file_name
 
-new_data_name = create_data('fake_data_986100.py', 170) # 170, 210
-student_count = [18, 18, 18, 18, 19, 18, 19, 17, 19, 14, 17]
-gd = GradingDashboard('fake_data_986100.py', anonymize=False, target_scorecount=6, student_count=student_count)
+def create_report():
+    print("Creating report")
+    gd = GradingDashboard('grade_data.py', anonymize=False, target_scorecount=6)
+    gd.make_full_report()
 
-gd.make_full_report()
+    print("Opening report")
 
-import os
-os.system("start file:///C:/Users/gabri/Desktop/Grading%20Dashboard/grading_dashboard.html")
+    dir_path = pathlib.Path(__file__).parent.resolve()
+    os.system(f'start file:///{dir_path}/grading_dashboard.html')
