@@ -1,12 +1,20 @@
-# Written by Gabriel Nilsson - gabriel.nilsson@uni.minerva.edu
+# Code author: Gabriel Nilsson - gabriel.nilsson@uni.minerva.edu
 
 from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
 import plotly.graph_objects as go
+from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats as sts
 import random as rnd
 import numpy as np
 import copy
+import math
+
+import os
+import pathlib
+
+import pandas as pd
+
 
 class GradingDashboard:
     '''
@@ -18,7 +26,7 @@ class GradingDashboard:
     2. Run all methods corresponding to the graphs and components you want in the report (in the order you want them to appear)
     3. Run create_html to create the .html file of the report
     '''
-    def __init__(self, file_name: str, anonymize: bool = False) -> None:
+    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None, student_count: list = []) -> None:
         '''
         Sets up global lists and dictionaries
         '''
@@ -27,86 +35,319 @@ class GradingDashboard:
         # Read in data
 
         # Open the file
-        with open(file_name, 'r', encoding='utf8') as file:
+        with open(file_name, 'r', encoding='utf-8') as file:
             data = file.read()
 
         # Dangerous eval call, should also test for errors
         try:
-            dict_all_init = eval(data)
+            self.dict_all = eval(data)
         except:
-            raise Exception("text in file not properly formatted dictionary")
+            raise Exception("text in file is not a properly formatted dictionary")
         else:
             # Make it robust to errors here
             ...
 
-        # Keep track of section ids, average scores, LO names, globally
-        self.section_ids = list(dict_all_init.keys())
+        grades_dict = self.dict_all["grades"]
 
+        self.target_scorecount = target_scorecount
+
+        # Keep track of section ids, average scores, LO names, globally
+        self.section_ids = list(grades_dict.keys())
+        
+        self.student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
+        
         if anonymize:
             # Shuffle key_order to anonymize report
-            key_order = list(dict_all_init.keys())
+            key_order = list(grades_dict.keys())
             rnd.shuffle(key_order)
-            self.dict_all = {k : dict_all_init[k] for k in key_order}
+            self.grades_dict = {k : grades_dict[k] for k in key_order}
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [f'Section {chr(i+65)}<br>' + str(id) for i, id in enumerate(self.section_ids)]
-            self.dict_all = dict_all_init
+            self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
+            self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
-        self.section_ids = list(self.dict_all.keys())
-
-        self.all_avgscores = [self.section_avg_scores(section_id) for section_id in self.section_ids]
+        self.section_ids = list(self.grades_dict.keys())
 
         self.all_scores = []
         self.all_LOs = set()
 
+        self.section_ids_w_scores = copy.deepcopy(self.section_ids)
         for section_id in self.section_ids:
+            # A sublist for this section
             self.all_scores.append([])
-            for student_id in self.dict_all[section_id]:
-                for submission_data in self.dict_all[section_id][student_id]:
+            for student_id in self.grades_dict[section_id]:
+                # A sublist for this student
+                self.all_scores[-1].append([])
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['score'] != None:
-                        self.all_scores[-1].append(submission_data['score'])
+                        # Add score for this specific student
+                        self.all_scores[-1][-1].append(submission_data['score'])
                     if submission_data['learning_outcome'] != None:
                         self.all_LOs.add(submission_data['learning_outcome'])
+                # If this student had no scores, omit the list
+                if len(self.all_scores[-1][-1]) == 0:
+                    self.all_scores[-1] = self.all_scores[-1][:-1]
 
+            # If this section had no scores yet, occurs when only comments are exist
+            if len(self.all_scores[-1]) == 0:
+                print("NO SCORES")
+                self.all_scores[-1].append([np.nan])
+                # Keep note of the section ids that actually have scores
+                self.section_ids_w_scores.remove(section_id)
+
+        self.all_avgscores = []
+        for i, section_id in enumerate(self.section_ids):
+            #avg_scores = self.section_avg_scores(section_id_w_scores)
+            # add a sublist for this section
+            self.all_avgscores.append([])
+            if section_id in self.section_ids_w_scores:
+                for student_scores in self.all_scores[i]:
+                    self.all_avgscores[-1].append(np.mean(student_scores))
+            else:
+                self.all_avgscores[-1].append(np.nan)
+
+        #print("all_scores:", self.all_scores)
+        #print("all_avgscores:", self.all_avgscores)
+        #print("All sections with something", self.section_ids)
+        #print("All sections with scores", self.section_ids_w_scores)
         
         # Set up the colors for the different sections
         self.section_colors = disc_colors.Dark24[:len(self.section_ids)]
-        
+
+        # set up section colors for the tables
+        # Convert hexadecimal representation to rgb
+        table_section_colors = [tuple(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) for color in self.section_colors]
+        # Increase brightness with 20%
+        table_section_colors = [(min(255, int(rgb_val[0]*1.2)), min(255, int(rgb_val[1]*1.2)), min(255, int(rgb_val[2]*1.2))) for rgb_val in table_section_colors]
+        # Convert to string and set alpha=0.6
+        self.table_section_colors = [f'rgba({r}, {g}, {b}, 0.6)' for r, g, b in table_section_colors]
+
+        self.sorted_LOs = self.get_sorted_LOs()
+
         # The list of all figures (or html text), in the right order, to be included in the report html
         self.figures = []
-
+    
     def progress_table(self) -> None:
         ''' Produces table with progress indication, adds it to report '''
 
+        # Count number of scores and comments
         scores_counts = []
         comments_counts = []
-        for section_id in self.section_ids:
+        comment_wordcounts = []
+        for i, section_id in enumerate(self.section_ids):
             score_counter = 0
             comment_counter = 0
+            comment_wordcounter = 0
             student_count = 0
-            for student_id in self.dict_all[section_id]:
+            for student_id in self.grades_dict[section_id].keys():
                 student_count += 1
-                for submission_data in self.dict_all[section_id][student_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['score'] is not None:
                         score_counter += 1
                     if len(submission_data['comment']) > 1:
                         comment_counter += 1
-            scores_counts.append(round(score_counter/student_count,2))
+                        comment_wordcounter += len(submission_data['comment'].split(' '))
+            if len(self.student_count) == 0:
+                scores_counts.append(round(score_counter/student_count,2))
+            else:
+                scores_counts.append(round(score_counter/self.student_count[i],2))
             comments_counts.append(round(comment_counter/student_count,2))
+            comment_wordcounts.append(round(comment_wordcounter/student_count,2))
+
+        # Setup colors for score count
+        if self.target_scorecount is None:
+            scores_colorscale = ['lightblue']
+            score_color_indices = [0] * len(scores_counts)
+        else:
+            num_colors = 5
+            scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
+            score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
 
 
+        redblue_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
+
+        # If the max count equals the min count, display the average color for all
+        if max(comments_counts) == min(comments_counts):
+            comm_count_color_indices = [10] * len(comments_counts)
+        else:
+            # Otherwise display the linear change
+            comm_count_color_indices = [int(10+40*(val-min(comments_counts))/(max(comments_counts)-min(comments_counts))) for val in comments_counts]
+        if max(comment_wordcounts) == min(comment_wordcounts):
+            word_count_color_indices = [10] * len(comment_wordcounts)
+        else:
+            word_count_color_indices = [int(10+40*(val-min(comment_wordcounts))/(max(comment_wordcounts)-min(comment_wordcounts))) for val in comment_wordcounts]
+
+        # Collect all columns in one list
+        data = [self.section_names,
+                scores_counts,
+                comments_counts,
+                comment_wordcounts]
+        
+        # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=
-                                                    ['Section ID', 
+                                                    ['Section name', 
                                                      'Scores per student',
-                                                     'Comments per student']),
-                                        cells=dict(values=
-                                                   [self.section_ids,
-                                                    scores_counts,
-                                                    comments_counts]))])
+                                                     'Comments per student',
+                                                     'Comment wordcount per student']),
+                                        cells=dict(values=data,
+                                                    fill_color=[
+                                                        self.table_section_colors,
+                                                        np.array(scores_colorscale)[score_color_indices],
+                                                        np.array(redblue_colorscale)[comm_count_color_indices],
+                                                        np.array(redblue_colorscale)[word_count_color_indices]
+                                                    ],
+                                                    height=30))])
+        
+        # Make a dataframe of the data, it's more easily sortable
+        df = pd.DataFrame(data).T.sort_values(0).T
 
-        self.figures.append('<center><h1>Grading progress</h1></center>')
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+        scores_color_dict = {section_id:scores_colorscale[score_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        comm_color_dict = {section_id:redblue_colorscale[comm_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+        word_color_dict = {section_id:redblue_colorscale[word_count_color_indices[i]] for i, section_id in enumerate(self.section_names)}
+
+
+        # Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= selection["name"],
+                                                                                            # Sort ascending only for column 0
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values, # Sort all values according to selection
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                        [scores_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [comm_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [word_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]]
+                                                        ]),
+                                                "height": 30}},[0]]
+                            )
+                            for selection in [{"name": "Sort by section name", "col_i": 0}, 
+                                      {"name": "Sort by score count", "col_i": 1}, 
+                                      {"name": "Sort by comment count", "col_i": 2}, 
+                                      {"name": "Sort by wordcount", "col_i": 3}]
+                    ],
+                    direction = "down",
+                    y = 1.15,
+                    x = 1
+                )],
+                height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                font_size=15)
+        
+        self.figures.append('<center><h2>Grading progress summary</h2></center>')
+        self.figures.append("This table summarizes the grading progress for each section.<br>")
+        self.figures.append(f'The "scores per student" column will be colored more and more green as the value approaches the target number of scores per student, which for this assignment has been set to {self.target_scorecount}.<br>')
+        self.figures.append("<br>Try out sorting each column using the dropdown menu to the right.<br>")
+        self.figures.append("<i>The key associating each section ('Section C') with it's Forum section ID ('16193482') is found at the bottom of the report</i>")
+
+        self.figures.append(fig)
+
+    def LO_progress_table(self) -> None:
+        ''' Produces table with progress indication, adds it to report '''
+
+        # Count number of scores and comments
+        lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.sorted_LOs))]
+        for lo_index, lo_name in enumerate(self.sorted_LOs):
+            for section_index, section_id in enumerate(self.section_ids):
+                for student_id in self.grades_dict[section_id].keys():
+                    for submission_data in self.grades_dict[section_id][student_id]:
+                        if submission_data['learning_outcome'] == lo_name:
+                            lo_scores_counts[lo_index][section_index] += 1
+
+
+        # Calculate total number of scores per section
+        total_scores_given = np.array(lo_scores_counts[0])
+        for lo_index in range(1, len(lo_scores_counts)):
+            total_scores_given += np.array(lo_scores_counts[lo_index])
+
+        greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
+
+        # Figure out what color to assign each cell for each LO, in order of LO appearance in self.all_LOs
+        lo_color_indices = [[] for _ in range(len(self.sorted_LOs))]
+        for lo_index in range(len(self.all_LOs)):
+
+            # If the max count equals the min count, display the average color for all
+            if max(lo_scores_counts[lo_index]) == min(lo_scores_counts[lo_index]):
+                lo_color_indices[lo_index] = [25] * len(self.section_ids)
+            else:
+                # Otherwise display the linear change
+                lo_color_indices[lo_index] = [int(50*(val-min(lo_scores_counts[lo_index]))/(max(lo_scores_counts[lo_index])-min(lo_scores_counts[lo_index]))) for val in lo_scores_counts[lo_index]]
+
+        tot_lo_color_indices = []
+        if max(total_scores_given) == min(total_scores_given):
+            tot_lo_color_indices = [10] * len(self.section_ids)
+        else:
+            # Otherwise display the linear change
+            tot_lo_color_indices = [int(10+40*(val-min(total_scores_given))/(max(total_scores_given)-min(total_scores_given))) for val in total_scores_given]
+        # Collect all columns in one list
+        data = [self.section_names, total_scores_given]
+        data.extend(lo_scores_counts)
+
+        column_names = ['Section name', 'Total scores assigned']
+        for lo_name in self.sorted_LOs:
+            # I set this to False now because it looks bad if you make the html window wide,
+            # but leaving logic here if I want to use it later
+            if len(lo_name) > 8 and False:
+                column_names.append('Score count in ' + lo_name[:7] + '- ' + lo_name[7:])
+            else:
+                column_names.append('Score count in ' + lo_name)
+        
+        column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
+        #tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
+        
+        column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
+        
+        # Create table figure, with appropriate colors
+        fig = go.Figure(data=[go.Table(header=dict(values=column_names),
+                                        cells=dict(values=data,
+                                                    fill_color=column_colors,
+                                                    height=30))])
+        
+        # Make a dataframe of the data, it's more easily sortable
+        df = pd.DataFrame(data).T.sort_values(0).T
+
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+
+        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
+        total_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
+
+        lo_color_dicts = [{section_id:column_colors[lo_name_i+2][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(self.sorted_LOs))]
+
+        #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
+        #                  {"name": "Sort by total scores", "col_i": 1}]
+        #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
+        ## Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= selection["name"],
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
+                                                "fill": dict(color=[
+                                                        [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                        *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
+                                                "height": 30}}, [0]]
+                            )
+                            for selection in [
+                                {"name": "Sort by section name", "col_i": 0},
+                                {"name": "Sort by total scores", "col_i": 1},
+                                *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(self.sorted_LOs)]
+                            ]
+                    ],
+                    direction = "down",
+                    y = 1.15,
+                    x = 1
+                )],
+                height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                font_size=15)
+        
+        self.figures.append('<center><h2>LO grading progress</h2></center>')
+        self.figures.append('This table show how many scores each section has given, in total and for each LO')
         
         self.figures.append(fig)
 
@@ -117,112 +358,565 @@ class GradingDashboard:
         self.section_SDs = np.array([np.std(section_avgs) if len(section_avgs) > 0 else np.nan for section_avgs in self.all_avgscores])
 
         # Number of students in each section
-        self.section_sizes = np.array([len(self.dict_all[section_id].keys()) for section_id in self.section_ids])
+        self.section_sizes = np.array([len(self.grades_dict[section_id].keys()) for section_id in self.section_ids])
 
         # Overall average score and SDs, weighted by number of students. This defines the "average" section
-        overall_mean = sum(self.section_means * self.section_sizes)/sum(self.section_sizes)
-        overall_SD = sum(self.section_SDs * self.section_sizes)/sum(self.section_sizes)
-        average_section_size = np.mean(self.section_sizes)
+        overall_mean = sum([val for val in (self.section_means * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
 
-        p_values = []
-        effect_sizes = []
-        # Perform two-tailed difference of means test
-        # between each section and the "average" section
-        for i in range(len(self.section_means)):
-            # Standard error
-            standard_err = np.sqrt(self.section_SDs[i]**2 / self.section_sizes[i] + \
-                                   overall_SD**2 / average_section_size)
-            
-            # Effect size, and t-statistic
-            effect_sizes.append((self.section_means[i] - overall_mean)/overall_SD)
-            t_stat = (self.section_means[i] - overall_mean)/standard_err
-            
-            # degrees of freedom
-            df = min(average_section_size-1, self.section_sizes[i]-1)
-            
-            p_values.append(sts.t.sf(abs(t_stat), df) * 2)
+        overall_SD = sum([val for val in (self.section_SDs * self.section_sizes) if not np.isnan(val)])/sum(self.section_sizes)
+        #average_section_size = np.mean(self.section_sizes)
+
+        signif_count = np.zeros(len(self.section_names), int)
+        cohens_d_vals = np.zeros(len(self.section_names), float)
+        # For each group pair
+        for a_i in range(len(self.section_names)):
+            for b_i in range(a_i+1, len(self.section_names)):
+                # Count the number of other sections this section is significantly different with
+                _, p_value = sts.ttest_ind(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
+                # If this pair is significantly different, increment corresponding position in signif_count
+                if p_value < 0.05:
+                    signif_count[a_i] += 1
+                    signif_count[b_i] += 1
+
+                    # Calculate cohen's d between the two groups
+                    # Calculate effect size (Cohen's d), https://en.wikipedia.org/wiki/Effect_size#:~:text=large.%5B23%5D-,Cohen%27s,-d%20%5Bedit
+                    # variance of each group
+                    var_a = np.var(self.all_avgscores[a_i], ddof=1)
+                    var_b = np.var(self.all_avgscores[b_i], ddof=1)
+
+                    # Pooled standard deviation
+                    pooled_sd = np.sqrt(((len(self.all_avgscores[a_i])-1)*var_a + (len(self.all_avgscores[b_i])-1)*var_b ) / (len(self.all_avgscores[a_i] + self.all_avgscores[b_i])-2) )
+                    cohens_d = (np.mean(self.all_avgscores[a_i]) - np.mean(self.all_avgscores[b_i])) / pooled_sd
+                    
+                    # Store the accumulate absolute effect size, will be divided by count later
+                    cohens_d_vals[a_i] += abs(cohens_d)
+                    cohens_d_vals[b_i] += abs(cohens_d)
+
+        for i in range(len(self.section_names)):
+            if signif_count[i] == 0:
+                cohens_d_vals[i] = np.nan
+            else:
+                cohens_d_vals[i] = round(cohens_d_vals[i] / signif_count[i], 2)
 
         # Assign colors to cells
 
         # Create colorscales
         redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
-        yellowred_colorscale = sample_colorscale('YlOrRd', list(np.linspace(0, 1, 101)))
 
-        # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
-        mean_color_indices = [int(15+70*(val-min(self.section_means))/(max(self.section_means)-min(self.section_means))) for val in self.section_means]
-        # Let SDs vary linearly from 0.0 to 0.7 on yellowred colorscale
-        sd_color_indices = [int(70*(val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))) for val in self.section_SDs]
-        # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
+        colors = [
+            (0, 'red'),     # At 1, color is red
+            (25, 'orange'), # At 25, color is orange
+            (50, 'green'),  # At 50, color is green
+            (75, 'blue'),   # At 75, color is blue
+            (100, 'purple') # At 100, color is purple
+        ]
+
+        # Normalize the position values to be between 0 and 1
+        colors_normalized = [(pos/100.0, color) for pos, color in colors]
+
+        # Create the custom colormap
+        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)
+
+        # Create an array of 100 values ranging from 0 to 1
+        values = np.linspace(0, 1, 100)
+
+        # Create an array to store the RGB values of the colorscale
+        redblue_colorscale = cmap(values)
+        redblue_colorscale = ["rgba(" + str(int(255*val[0])) + ',' + str(int(255*val[1])) + ',' + str(int(255*val[2])) + ",0.6)" for val in redblue_colorscale]
+
+        greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
+        reds_colorscale = sample_colorscale('Reds', list(np.linspace(0, 1, 101)))
+
+        # If all means are equal
+        if max(self.section_means)-min(self.section_means) == 0 or np.isnan(max(self.section_means)) or np.isnan(min(self.section_means)):
+            # Set all colors to the middle point
+            mean_color_indices = [50] * len(self.section_means)
+        else:
+            # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
+            mean_color_indices = []
+            for mean_val in self.section_means:
+                if np.isnan(mean_val):
+                    mean_color_indices.append(50)
+                else:
+                    mean_color_indices.append(int(25*(mean_val-1)))
+        # If all SDs are equal
+        if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
+            # Set all colors to the middle point
+            sd_color_indices = [10] * len(self.section_SDs)
+        else:
+            # Let SDs vary linearly from 0.0 to 0.7 on yellowred colorscale
+            sd_color_indices = []
+            for SD_val in self.section_SDs:
+                if np.isnan(SD_val):
+                    sd_color_indices.append(0)
+                else:
+                    sd_color_indices.append(int(10+40*(SD_val-min(self.section_SDs))/(max(self.section_SDs)-min(self.section_SDs))))
+        
         # precalc the min and max according to absolute value of effect size
-        min_abs_effect = min([abs(val) for val in effect_sizes]) 
-        max_abs_effect = max([abs(val) for val in effect_sizes])
-        effect_color_indices = [int(70*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) for val in effect_sizes]
+        cohens_d_numbers = [0 if np.isnan(val) else val for val in cohens_d_vals]
+        min_abs_effect = min([abs(val) for val in cohens_d_numbers if val != 0])
+        max_abs_effect = max([abs(val) for val in cohens_d_numbers])
 
-        # Manual logic for coloring the p-values
-        p_colors = []
-        for val in p_values:
-            if val < 0.05: #0.05
-                # significant
-                p_colors.append('red')
-            elif val < 0.1: #0.1
-                # close to significant
-                p_colors.append('orange')
-            elif val < 0.3: #0.3
-                # not strongly non-significant
-                p_colors.append('mistyrose') 
-            else:
-                # strongly not significant
-                p_colors.append('palegreen')
+        #only_number_effect = [val for val in effect_sizes if isinstance(val, float) or isinstance(val, int)]
+        # If all effect sizes are equal
+        if max_abs_effect - min_abs_effect == 0 or math.isinf(max_abs_effect):
+            effect_color_indices = [0] * len(cohens_d_vals)
+        else:
+            # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
+            effect_color_indices = [int(10+60*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) if val != 0 else 0 for val in cohens_d_numbers]
+
+
+        # precalc the min and max according to absolute value of effect size
+        min_signif_count = min([val for val in signif_count]) 
+        max_signif_count = max([val for val in signif_count])
+
+        # If all effect sizes are equal
+        if max_signif_count - min_signif_count == 0:
+            signif_count_color_indices = [0] * len(signif_count)
+        else:
+            # Convert nan to 0's for color indices
+            signif_count_color_indices = [int(60*(abs(val)-min_signif_count)/(max_signif_count-min_signif_count)) for val in signif_count]
+        
                 
-
         # Create table
+        
+        data = [self.section_names[:],
+                [round(val,3) for val in self.section_means],
+                [round(val,3) for val in self.section_SDs],
+                [round(val,5) for val in signif_count],
+                [round(val,5) for val in cohens_d_vals]]
+        
+        data[0].insert(0, '<b>Average</b>')
+        this_table_section_colors = self.table_section_colors[:]
+        this_table_section_colors.insert(0, 'white')
+
+        data[1].insert(0, '<b>' + str(round(overall_mean, 3)) + '</b>')
+        mean_colors = list(np.array(redblue_colorscale)[mean_color_indices])
+        mean_colors.insert(0, 'white')
+
+        data[2].insert(0, '<b>' + str(round(overall_SD, 3)) + '</b>')
+        sd_color_indices.insert(0, 0)
+        data[3].insert(0, '<b>NA</b>')
+        signif_count_color_indices.insert(0, 0)
+        data[4].insert(0, '<b>NA</b>')
+        effect_color_indices.insert(0, 0)
+
+        for column_i in range(1, 5):
+            for i in range(len(data[column_i])):
+                data[column_i][i] = str(data[column_i][i])
+                if data[column_i][i] == 'nan':
+                    if column_i != 3:
+                        data[column_i][i] = ' NA'
+                    else:
+                        data[column_i][i] = 'NA'
+
 
         fig = go.Figure(data=[go.Table(header=dict(values=
-                                                    ['Section ID', 
+                                                    ['Section name', 
                                                      'Mean score',
                                                      'Standard Deviation',
-                                                     'p-values',
-                                                     'effect size']),
-                                        cells=dict(values=
-                                                   [self.section_ids,
-                                                    [round(val,3) for val in self.section_means],
-                                                    [round(val,3) for val in self.section_SDs],
-                                                    [round(val,5) for val in p_values],
-                                                    [round(val,5) for val in effect_sizes]],
+                                                     'Count of significant tests',
+                                                     'Avg effect size among significant']),
+                                        cells=dict(values=data,
                                                     fill_color=[
-                                                        'lightblue',
-                                                        np.array(redblue_colorscale)[mean_color_indices],
-                                                        np.array(yellowred_colorscale)[sd_color_indices],
-                                                        p_colors,
-                                                        np.array(yellowred_colorscale)[effect_color_indices]
-                                                    ]),
-                                        hoverinfo='all',
-                                        hoverlabel=dict())])
+                                                        this_table_section_colors,
+                                                        mean_colors,
+                                                        np.array(greys_colorscale)[sd_color_indices],
+                                                        np.array(reds_colorscale)[signif_count_color_indices],
+                                                        np.array(reds_colorscale)[effect_color_indices]
+                                                    ],
+                                                    height=30))])
+        
+        # Make a dataframe of the data, it's more easily sortable
+        df = pd.DataFrame(data).T.sort_values(0).T
 
-        self.figures.append('<center><h1>Summary statistics</h1></center>')
+        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+        section_color_dict = {section_id:this_table_section_colors[i] for i, section_id in enumerate(data[0])}
+        mean_color_dict = {section_id:mean_colors[i] for i, section_id in enumerate(data[0])}
+        sd_color_dict = {section_id:greys_colorscale[sd_color_indices[i]] for i, section_id in enumerate(data[0])}
+        signf_count_dict = {section_id:reds_colorscale[signif_count_color_indices[i]] for i, section_id in enumerate(data[0])}
+        effect_color_dict = {section_id:reds_colorscale[effect_color_indices[i]] for i, section_id in enumerate(data[0])}
+        
+
+        # Create sorting drop-down menu
+        fig.update_layout(
+            updatemenus=[dict(
+                    buttons= [dict(
+                            method= "restyle",
+                            label= selection["name"],
+                                                                                            # Sort ascending only for column 0 and 3
+                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values, # Sort all values according to selected column
+                                                "fill": dict(color=[[section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure colors are with correct cell
+                                                        [mean_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [sd_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [signf_count_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                        [effect_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]]
+                                                        ]), 
+                                                "height": 30}},[0]]
+                            )
+                            for selection in [{"name": "Sort by section name", "col_i": 0}, 
+                                      {"name": "Sort by mean", "col_i": 1}, 
+                                      {"name": "Sort by standard deviation", "col_i": 2}, 
+                                      {"name": "Sort by signif count", "col_i": 3}, 
+                                      {"name": "Sort by avg effect size", "col_i": 4}]
+                    ],
+                    direction = "down",
+                    y = 1.15,
+                    x = 1
+                )],
+                height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
+                font_size=15)
+
+        self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
+        self.figures.append('This table summarizes the information from pairwise t-tests between each section. The detailed information of each t-test can be found below this table.<br>')
+        self.figures.append('The "Count of significant tests" describes how many other sections this specific section is different from, with statistical significance.<br>')
+        self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
+        self.figures.append('The final column "Avg effect size among significant" displays the average cohen\'s d among all significant tests, so the average number of standard deviations the means are in all significant tests.<br>')
         
         self.figures.append(fig)
 
+    def t_test_grids(self) -> None:
+        '''
+        Normal difference of means test, assumes normality of data 
+        Assummptions:
+        - continuous variables
+        - Normal distribution of data
+        - independent groups
+        - Sufficient sample size (preferable more than ~20)
+        '''
+
+        # Calculate p-value between each group
+        cohens_d_vals = np.zeros((len(self.section_names), len(self.section_names)))
+        cohens_d_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        t_test_pvals_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        t_test_pvals_colori = np.zeros((len(self.section_names), len(self.section_names)))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    cohens_d_text[b_i][a_i] = ''
+                    cohens_d_vals[a_i, b_i] = np.nan
+                    t_test_pvals_text[b_i][a_i] = ''
+                    t_test_pvals_colori[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    cohens_d_text[b_i][a_i] = '<b>X</b>'
+                    cohens_d_vals[a_i, b_i] = 0
+                    t_test_pvals_text[b_i][a_i] = '<b>X</b>'
+                    t_test_pvals_colori[a_i, b_i] = 0.6
+                    continue
+                else:
+                    t_test_pvals_colori[a_i, b_i] = 0.73
+
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+
+                        # Calculate p_value
+                        _, p_value = sts.ttest_ind(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
+                        # Calculate effect size (Cohen's d), https://en.wikipedia.org/wiki/Effect_size#:~:text=large.%5B23%5D-,Cohen%27s,-d%20%5Bedit
+                        # variance of each group
+                        var_a = np.var(self.all_avgscores[a_i], ddof=1)
+                        var_b = np.var(self.all_avgscores[b_i], ddof=1)
+
+                        # Pooled standard deviation
+                        pooled_sd = np.sqrt( ( (len(self.all_avgscores[a_i])-1)*var_a + (len(self.all_avgscores[b_i])-1)*var_b ) / (len(self.all_avgscores[a_i] + self.all_avgscores[b_i])-2) )
+                        cohens_d = (np.mean(self.all_avgscores[a_i]) - np.mean(self.all_avgscores[b_i])) / pooled_sd
+
+                        cohens_d_vals[a_i, b_i] = round(cohens_d, 2)
+                        cohens_d_text[b_i][a_i] = str(round(cohens_d, 2))
+                        t_test_pvals_text[b_i][a_i] = str(round(p_value, 5))
+                        if p_value < 0.05 and not p_value == 0:
+                            t_test_pvals_colori[a_i, b_i] = 0.1
+                        elif p_value < 0.1:
+                            t_test_pvals_colori[a_i, b_i] = 0.25
+
+        # Do some flipping around so that it becomes a lower triangle down-left
+        t_test_pvals_text = [list(row) for row in reversed(t_test_pvals_text)]
+        cohens_d_text = [list(row) for row in reversed(cohens_d_text)]
+        t_test_pvals_colori = np.transpose(np.array(t_test_pvals_colori))
+        t_test_pvals_colori = [list(row) for row in reversed(t_test_pvals_colori)]
+        fig = go.Figure(data=go.Heatmap(z=t_test_pvals_colori,
+                                        zmax=1,
+                                        zmin=0,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        customdata=t_test_pvals_text,
+                                        text=t_test_pvals_text,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        texttemplate="%{text}",
+                                        hoverongaps=False,
+                                        colorscale='RdBu'))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="<b>p-values from T tests</b><br>Significant tests (p<.05) is colored in red")
+        fig.update_traces(showscale=False)
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+        # Coordinates to highlight
+        highlight_coords = []
+        for a_i in range(len(self.section_names)-1):
+            for b_i in range(len(self.section_names)-a_i-1):
+                if float(t_test_pvals_text[a_i][b_i]) < 0.05:
+                    highlight_coords.append((self.section_names[b_i], self.section_names[len(self.section_names)-a_i-1]))
+        highlight_coords = [val for val in highlight_coords for _ in range(2)]
+
+        # Scatter trace for highlighting
+        highlight_scatter = go.Scatter(
+            x=[x for x, _ in highlight_coords],
+            y=[y for _, y in highlight_coords],
+            mode='markers',
+            marker=dict(
+                size=14,  # Adjust the size as needed
+                symbol='triangle-up',
+                line=dict(
+                    color='black',
+                    width=1.5
+                ),
+                color='rgba(1,1,1,1)',  # Fully transparent fill
+                angle=[270, 90] * len(highlight_coords),
+                standoff=26 # 20 for arrow-wide
+            ),
+            showlegend=False,
+            hoverinfo='skip'
+        )
+
+        # Do some flipping around so that it becomes a lower triangle down-left
+        cohens_d_vals = np.transpose(np.array(cohens_d_vals))
+        cohens_d_vals = [list(row) for row in reversed(cohens_d_vals)]
+        fig = go.Heatmap(z=cohens_d_vals,
+                                        zmax=1,
+                                        zmin=-1,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        customdata=cohens_d_vals,
+                                        text=cohens_d_text,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.2f}',
+                                        texttemplate="%{text}",
+                                        hoverongaps=False,
+                                        colorscale='RdBu')
+        
+        fig = go.Figure(data=[fig, highlight_scatter])
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are.<br>Positive values mean that y-axis section has larger mean than x-axis section.")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+    # Not used currently
+    def mann_whitney_grid(self) -> None:
+        '''
+        Mann-Whitney tests whether two groups are different or not (come from the same distribution)
+        Variables are assumed to be continuous (so student averages, not individual scores),
+        and data is assumed to be non-Normal (skewed), 
+        Assummptions:
+        - continuous variables
+        - non-Normal data, but similar in shape between groups
+        - independent groups
+        - Sufficient sample size (usually more than 5)
+        '''
+
+        # Calculate mann-whitney test between each combination of groups.
+        # Calculate the Mann-Whitney U test
+        # null hypothesis is that the prob of X > Y equals prob of Y > X
+        mannwhitney_ustats = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals_signif = np.zeros((len(self.section_names), len(self.section_names)))
+        mannwhitney_pvals_signif_text = [['' for _ in range(len(self.section_names))] for _ in range(len(self.section_names))]
+        wilcoxon_data = np.zeros((len(self.section_names), len(self.section_names)))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    mannwhitney_ustats[a_i, b_i] = np.nan
+                    mannwhitney_pvals[a_i, b_i] = np.nan
+                    mannwhitney_pvals_signif[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    mannwhitney_ustats[a_i, b_i] = 0
+                    mannwhitney_pvals[a_i, b_i] = 0
+                    mannwhitney_pvals_signif[a_i, b_i] = 0.6
+                    mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<b>X</b>'
+
+                    continue
+                else:
+                    mannwhitney_pvals_signif[a_i, b_i] = 0.73
 
 
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+                        print(self.all_avgscores[a_i])
+                        print(self.all_avgscores[b_i])
+                        u_stat, p_value_mw = sts.mannwhitneyu(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+
+                        #stat, p_value_w = sts.wilcoxon(self.all_avgscores[a_i], self.all_avgscores[b_i], nan_policy='omit')
+                        mannwhitney_ustats[a_i, b_i] = u_stat
+                        mannwhitney_pvals[a_i, b_i] = p_value_mw
+                        if a_i == 3 or b_i == 3:
+                            print(p_value_mw)
+                            print(p_value_mw == 0)
+                        if p_value_mw < 0.05 and not p_value_mw == 0:
+                            mannwhitney_pvals_signif[a_i, b_i] = 0.1
+                            mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.05'
+                        elif p_value_mw < 0.1:
+                            mannwhitney_pvals_signif[a_i, b_i] = 0.25
+                            mannwhitney_pvals_signif_text[len(self.section_names)-b_i-1][a_i] = '<0.1'
+
+                        #wilcoxon_data[a_i, b_i] = stat
+
+        print(mannwhitney_ustats)
+        print(mannwhitney_pvals)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_ustats = np.transpose(np.array(mannwhitney_ustats))
+        mannwhitney_ustats = [list(row) for row in reversed(mannwhitney_ustats)]
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_ustats,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="U-statistic from Mann-Whitney tests")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+        #p_val_significance = np.array(mannwhitney_pvals) < 0.05
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_pvals = np.transpose(np.array(mannwhitney_pvals))
+        mannwhitney_pvals = [list(row) for row in reversed(mannwhitney_pvals)]
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_pvals,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="p-values from Mann-Whitney tests")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+        print(mannwhitney_pvals_signif)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        mannwhitney_pvals_signif = np.transpose(np.array(mannwhitney_pvals_signif))
+        mannwhitney_pvals_signif = [list(row) for row in reversed(mannwhitney_pvals_signif)]
+        print(mannwhitney_pvals_signif)
+        fig = go.Figure(data=go.Heatmap(z=mannwhitney_pvals_signif,
+                                        zmax=1,
+                                        zmin=0,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)),
+                                        text=mannwhitney_pvals_signif_text,
+                                        hoverongaps=False,
+                                        customdata=mannwhitney_pvals,
+                                        name='',
+                                        hovertemplate='%{x}<br>%{y}<br>%{customdata:.5f}',
+                                        texttemplate="%{text}",
+                                        colorscale='RdBu'))
+        
+        fig.update_layout(plot_bgcolor='white', 
+                          title="<b>Significance of Mann-Whitney test between each section</b><br>with a significance level of a=0.05")
+        fig.update_traces(showscale=False)
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+
+        self.figures.append(fig)
+
+    # Not used currently
+    def prob_of_superiority_grid(self) -> None:
+        '''
+        Mann-Whitney tests whether two groups are different or not (come from the same distribution)
+        Variables are assumed to be continuous (so student averages, not individual scores),
+        and data is assumed to be non-Normal (skewed), 
+        Assummptions:
+        - continuous variables
+        - non-Normal data, but similar in shape between groups
+        - independent groups
+        - Sufficient sample size (usually more than 5)
+        '''
+
+        # Calculate mann-whitney test between each combination of groups.
+        # Calculate the Mann-Whitney U test
+        # null hypothesis is that the prob of X > Y equals prob of Y > X
+        prob_superiority = np.zeros((len(self.section_names), len(self.section_names)))
+        for a_i in range(len(self.section_names)):
+            for b_i in range(len(self.section_names)):
+                
+                # Populate upper triangle with nan
+                if b_i < a_i:
+                    prob_superiority[a_i, b_i] = np.nan
+                    continue
+                elif b_i == a_i:
+                    prob_superiority[a_i, b_i] = 0.5
+                    continue
+
+
+                if len(self.all_avgscores[a_i]) > 0 and len(self.all_avgscores[b_i]) > 0:
+                    if not np.isnan(self.all_avgscores[a_i][0]) and not np.isnan(self.all_avgscores[b_i][0]):
+                        print(self.all_avgscores[a_i])
+                        print(self.all_avgscores[b_i])
+                        
+                        # Total number of pairings
+                        tot_pairs = len(self.all_avgscores[a_i]) * len(self.all_avgscores[b_i])
+
+                        # How many of those pairs is A superior
+                        sup_count = 0
+                        for a_val in self.all_avgscores[a_i]:
+                            for b_val in self.all_avgscores[b_i]:
+                                if a_val > b_val:
+                                    sup_count += 1
+
+                        prob_superiority[a_i, b_i] = sup_count / tot_pairs
+                        
+
+
+        print(prob_superiority)
+        # Do some flipping around so that it becomes a lower triangle down-left
+        prob_superiority = np.transpose(np.array(prob_superiority))
+        prob_superiority = [list(row) for row in reversed(prob_superiority)]
+        fig = go.Figure(data=go.Heatmap(z=prob_superiority,
+                                        x=self.section_names,
+                                        y=list(reversed(self.section_names)), 
+                                        hoverongaps=False))
+        
+        fig.update_layout(plot_bgcolor='white',
+                          title="Probability of superiority between each group")
+        fig.update_xaxes(showline=False)
+        fig.update_yaxes(showline=False)
+        
+        self.figures.append(fig)
+    
     def section_avg_scores(self, section_id: int) -> list:
         ''' Returns a list with the average score of each student for this section '''
         
-        student_ids = list(self.dict_all[section_id].keys())
+        student_ids = list(self.grades_dict[section_id].keys())
         avg_scores = []
 
         # For each student
         for this_student_id in student_ids:
             # Calculate average score
             student_scores = []
-            for score_data in self.dict_all[section_id][this_student_id]:
+            for score_data in self.grades_dict[section_id][this_student_id]:
                 # Excluded None
                 if score_data['score'] != None:
                     student_scores.append(score_data['score'])
-            avg_scores.append(np.mean(student_scores))
+            if len(student_scores) > 0:
+                avg_scores.append(np.mean(student_scores))
 
         return avg_scores
     
+    # Not used currently
     def section_scoreavgs_plot(self, section_id: int, bin_size:int=0.2) -> None:
         ''' Creates plot that shows the distribution of average scores, for given section'''
 
@@ -246,38 +940,62 @@ class GradingDashboard:
         
         # Add plot to the report
         self.figures.append(fig)
-
-
+    
     def scoreavgs_allsections_plot(self, bin_size:int=0.2) -> None:
-        ''' Creates plot that shows overlaying histograms of student scores for each section '''
+        ''' Creates plot that shows a single histogram of student scores distribution '''
 
-        # For each section
-        histograms = []
-        for i, section_id in enumerate(gd.section_ids):
-            
-            # Make histogram
-            histograms.append(go.Histogram(
-                        x=self.section_avg_scores(section_id),
-                        xbins=dict(
-                            start=0,
-                            end=5,
-                            size=bin_size
-                        ),
-                        opacity=0.3,
-                        name=f'Section {chr(i+65)}'))
-            
-        fig = go.Figure(data=histograms)
+        # Flatten the list of scores
+        all_scores_flat = [avg_score for section_lst in self.all_avgscores for avg_score in section_lst if not np.isnan(avg_score)]
+
+        # Make histogram    
+        fig = go.Figure(data=go.Histogram(
+                    x=all_scores_flat,
+                    xbins=dict(
+                        start=0,
+                        end=5,
+                        size=bin_size),
+                    opacity=0.8,
+                    showlegend=False))
         
-        fig.update_traces(marker_line_width=1,marker_line_color="white")
+        # Manually calculate the height of the bins to write it as text
+        counts = []
+        left_edge = 0
+        all_scores_flat_sorted = sorted(all_scores_flat)
+        current_index = 0
+        while left_edge < 5:
+            left_edge += 0.2
+
+            old_index = current_index
+            # If this region contains scores
+            while all_scores_flat_sorted[current_index] < left_edge + 0.1999:
+                # count how many scores
+                current_index += 1
+                if current_index == len(all_scores_flat_sorted):
+                    break
+            # If there was any, add it to counts
+            if current_index - old_index > 0:
+                counts.append(current_index - old_index)
+            # If there were none, but this is not first bin, add empty text
+            elif len(counts) > 0:
+                counts.append('')
+
+            if current_index == len(all_scores_flat_sorted):
+                break
+                
+        fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
+        
+        fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
+        # Count total number of students
+        student_count_tot = len([student_id for section in self.grades_dict.keys() for student_id in self.grades_dict[section].keys() ]) 
         fig.update_layout(
-            title=f'Score distribution across all sections ({len(gd.section_ids)} sections)',
+            title=f'<b>Student score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} students)',
             xaxis_title='Score',
-            yaxis_title='Count',
-            barmode='overlay')
+            yaxis_title='Count')
+        
+        fig.update_xaxes(dtick=0.2)
         
         # Add plot to the report
         self.figures.append(fig)
-
 
     def ANOVA_test(self, averages=True) -> None:
         ''' Performs oneway ANOVA test, and creates html text presenting the results. '''
@@ -290,27 +1008,43 @@ class GradingDashboard:
             scores = self.all_scores
 
         # Perform the ANOVA test
-        f_stat, p_value = sts.f_oneway(*scores)
+        try:
+            # Remove all nan from scores
+            filtered_scores = []
+            for sublist in scores:
+                if not np.isnan(sublist[0][0]):
+                    filtered_scores.append([val for lst in sublist for val in lst])
 
-        output = ''
-        # Display the results
-        # Small p-value means statistically significant
-        output += "<center><h1> ANOVA Results</h1></center>"
-        output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
-        output += "(With significance level = 0.05)<br>"
-        if p_value < 0.05:
-            output += "We reject the null hypothesis. At least one section has a different mean than the other groups, with statistical significance. There's a" + str(round(p_value*100, 2)) + "% chance of a Type I error.\n\n"
-        else:
-            output += "We don't reject the null hypothesis. We don't have statistically significant evidence that the means of each group aren't the same.\n\n"
-        # F-statistic: Variation between sample means / Variation within samples
-        # Large F-statistic means that there is difference somewhere
-        output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
-        output += "A larger F-statistic means more difference between groups.<br>"
-        output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 2)) + " times larger than the <b>variance within samples</b>."
+            f_stat, p_value = sts.f_oneway(*filtered_scores)
+            #f_stat, p_value = f_stat[0], p_value[0]
+            if np.isnan(f_stat) or np.isnan(p_value):
+                raise Exception("Not enough data")
 
-        # Add text to the report
-        self.figures.append(output)
+            output = ''
+            
+            # Display the results
+            # Small p-value means statistically significant
+            output += "<center><h2> ANOVA Results (global significance test)</h2></center>"
+            output += "ANOVA is a difference of means test for multiple groups. It gives a global p-value, which if significant, means that it's likely that a students average score is effected by the students section, in general.<br>"
+            output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
+            output += "(With significance level = 0.05)<br>"
+            if p_value < 0.05:
+                output += "We reject the null hypothesis. At least one section has a different mean than the other groups, with statistical significance. There's a " + str(round(p_value*100, 2)) + "% chance of a Type I error.\n\n"
+            else:
+                output += "We don't reject the null hypothesis. We don't have statistically significant evidence that any group has a mean different from the others.\n\n"
+            # F-statistic: Variation between sample means / Variation within samples
+            # Large F-statistic means that there is difference somewhere
+            output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
+            output += "A larger F-statistic means more difference between groups.<br>"
+            output += "An F-stat of " + str(round(f_stat, 3)) + " means that the variance between <b>sample means</b> is " + str(round(f_stat, 3)) + " times the <b>variance within samples</b>."
 
+            # Add text to the report
+            self.figures.append(output)
+        except Exception as e:
+            output = ''
+            output += "<center><h1> ANOVA Results</h1></center>"
+            output += "Couldn't perform ANOVA test because:<br>" + str(e)
+            self.figures.append(output)
 
     def boxplots(self, averages=True) -> None:
         ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
@@ -418,7 +1152,7 @@ class GradingDashboard:
 
 
         fig.update_layout(
-            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplot is quartiles, black lines are mean +- 1 SD',
+            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplots are quartiles, black lines are mean +- 1 SD',
             xaxis_title='Section',
             yaxis_title='Scores',
             height=800,
@@ -435,7 +1169,133 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
+    def boxplots_new(self, averages=True) -> None:
+        ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
 
+        # Whether considering student average scores, or all individual LO/HC scores
+        # Deepcopy because we will edit local copy.
+        if averages:
+            scores = copy.deepcopy(self.all_avgscores)
+        else:
+            scores = copy.deepcopy(self.all_scores)
+
+        fig = go.Figure()
+
+        # Flatten scores list for plotting
+        for section_scores in scores:
+            # We need 5 datapoints for the mean and SD plotting to work
+            # So if fewer, add None to make the difference
+            if len(section_scores) < 5:
+                diff = 5 - len(section_scores)
+                section_scores.extend([None] * diff)
+
+        # For a given section in this list,
+        # All datapoints will be at the mean except
+        # 2 datapoints which will be +1 and -1 SD.
+        means_and_SDs = []
+
+        # calcuate means and SDs
+        for section_scores in scores:
+            filtered_list = [score for score in section_scores if score is not None]
+            # If there's any scores in this section
+            this_mean_and_SD = []
+            if len(filtered_list) > 0:
+                mean = np.mean(filtered_list)
+                std_dev = np.std(filtered_list)
+                this_mean_and_SD.append(mean-std_dev)
+                this_mean_and_SD.append(mean+std_dev)
+
+                # Fill the rest of the section with the mean
+                remaining_count = len(section_scores) - 2
+                this_mean_and_SD.extend([mean] * remaining_count)
+            # There are no scores in this section yet
+            else:
+                this_mean_and_SD.extend([None]*5)
+            means_and_SDs.append(this_mean_and_SD)
+
+
+        tickvals_list = []
+        ticktext_list = []
+        for i, group in enumerate(self.section_names):
+            fig.add_trace(go.Box(
+                y=scores[i],
+                name=group,
+                marker_color=self.section_colors[i],
+                legendgroup=group,
+                quartilemethod="inclusive",
+                showlegend = True
+            ))
+
+            tickvals_list.append(group)
+            ticktext_list.append(group)
+
+            # Boxplot only displaying mean and SDs
+            fig.add_trace(go.Box(
+                y=means_and_SDs[i],
+                name=group + '+',
+                legendgroup=group,
+                line_width=3,
+                whiskerwidth=1,
+                marker_color=self.section_colors[i],
+                quartilemethod="inclusive",
+                boxpoints=False,
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Add a transparent scatterplot over the mean & SD boxplot to fix hover text
+            fig.add_trace(go.Scatter(
+                y=[max(means_and_SDs[i])],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean + 1sd: %{y:.2f}<extra></extra>'
+            ))
+            fig.add_trace(go.Scatter(
+                y=[means_and_SDs[i][-1]],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean: %{y:.2f}<extra></extra>'
+            ))
+            fig.add_trace(go.Scatter(
+                y=[min(means_and_SDs[i])],
+                x=[group+'+'],
+                legendgroup=group,
+                marker_color='rgba(1,1,1,0)',
+                showlegend=False,
+                hovertemplate='Mean - 1sd: %{y:.2f}<extra></extra>'
+            ))
+
+            tickvals_list.append(group+'+')
+            ticktext_list.append('')
+
+
+        fig.update_layout(
+            title='<b>Student score averages</b>, per section<br>Box plots are quartiles<br>adjacent whiskerplots are mean +/- 1sd',
+            xaxis_title='Section',
+            yaxis_title='Scores',
+            height=800,
+            legend=dict(groupclick="togglegroup"),
+            xaxis=dict(
+                tickvals=tickvals_list,
+                ticktext=ticktext_list
+            ),
+            hovermode='x'
+        )
+
+
+        with open('only_boxplot.html', 'a') as f:
+            # Remove contents
+            f.truncate(0)
+            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+
+        # Add plot to the report
+        self.figures.append(fig)
+
+    # Not used currently
     def violinplots(self, averages=True) -> None:
         ''' Creates side by side violinplots '''
 
@@ -460,7 +1320,7 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
-
+    # Not used currently
     def LO_kde_plot(self, LO_name:str) -> None:
         ''' Creates side by side kde plots with mean, displaying general grade distribution per section '''
         
@@ -470,8 +1330,8 @@ class GradingDashboard:
         score_count = 0
         for section_id in self.section_ids:
             LO_scores.append([])
-            for student_id in self.dict_all[section_id]:
-                for submission_data in self.dict_all[section_id][student_id]:
+            for student_id in self.grades_dict[section_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         score_count += 1
                         LO_scores[-1].append(submission_data['score'])
@@ -505,24 +1365,24 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
 
-
     def LO_stackedbar_plot(self, LO_name:str) -> None:
         ''' Create stacked barplot with percentages '''
         
         # Find scores of this LO in each section
-        LO_scores_perc = []
+        LO_scores_count = []
 
         for section_id in self.section_ids:
             # Add 5 counters for the 5 possible scores
-            LO_scores_perc.append(np.zeros(5))
-            for student_id in self.dict_all[section_id]:
-                for submission_data in self.dict_all[section_id][student_id]:
+            LO_scores_count.append(np.zeros(5))
+            for student_id in self.grades_dict[section_id]:
+                for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
-                        LO_scores_perc[-1][int(submission_data['score'])-1] += 1
+                        LO_scores_count[-1][int(submission_data['score'])-1] += 1
         
+        LO_scores_perc = [np.zeros(5) for _ in range(len(self.section_ids))]
         # If there are any scores, convert counts to percentages [0-1]
-        for i, section in enumerate(LO_scores_perc):
+        for i, section in enumerate(LO_scores_count):
             if sum(section) > 0:
                 LO_scores_perc[i] = np.array(section)/sum(section)
 
@@ -535,12 +1395,12 @@ class GradingDashboard:
                                  x=self.section_names, 
                                  y=score_fractions, 
                                  marker=dict(color=colors[score-1]),
-                                 text=[str(round(val*100, 1)) + '%' for val in score_fractions],
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
                                  textposition='inside'))
             
         # Change the bar mode to stack
         fig.update_layout(
-            title=f'<b>Percentage of students receiving score in {LO_name} per section</b><br>Stacked barplots.',
+            title=f'<b>Score distribution for {LO_name} per section</b><br>Stacked barplots.',
             xaxis_title='Section',
             yaxis_title='Percentage',
             height=800,
@@ -551,20 +1411,79 @@ class GradingDashboard:
         # Add plot to the report
         self.figures.append(fig)
         
+    def LO_stackedbar_plot_all(self) -> None:
+        ''' Create stacked barplot with percentages '''
+        
+        # Find scores of this LO in each section
+        LO_scores_count = []
+
+        for LO_name in self.sorted_LOs:
+            LO_scores_count.append(np.zeros(5))
+            for section_id in self.section_ids:
+                # Add 5 counters for the 5 possible scores
+                for student_id in self.grades_dict[section_id]:
+                    for submission_data in self.grades_dict[section_id][student_id]:
+                        if submission_data['learning_outcome'] == LO_name:
+                            # Increment the the counter corresponding to the score
+                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+            
+        LO_scores_perc = [np.zeros(5) for _ in range(len(self.all_LOs))]
+        # If there are any scores, convert counts to percentages [0-1]
+        for i, this_lo_dist in enumerate(LO_scores_count):
+            if sum(this_lo_dist) > 0:
+                LO_scores_perc[i] = np.array(this_lo_dist)/sum(this_lo_dist)
+
+        # The official minerva grade colors, from left to right, 1 to 5
+        colors = ['rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+        fig = go.Figure()
+        for score in range(1, 6):
+            score_fractions = [section_scores[score-1] for section_scores in LO_scores_perc]
+            fig.add_trace(go.Bar(name=score,
+                                 x=list(self.sorted_LOs), 
+                                 y=score_fractions, 
+                                 marker=dict(color=colors[score-1]),
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
+                                 textposition='inside'))
+            
+        # Change the bar mode to stack
+        fig.update_layout(
+            title=f'<b>Score distribution per LO</b><br>Stacked barplots.',
+            xaxis_title='Learning Outcome',
+            yaxis_title='Percentage',
+            height=800,
+            barmode='stack')
+        
+        for i, lo_name in enumerate(self.sorted_LOs):
+            fig.add_annotation(x=lo_name, y=1, yshift=10,
+                               text=f'{int(sum(LO_scores_count[i]))} Score' + ('s' if int(sum(LO_scores_count[i])) > 1 else ''), 
+                               showarrow=False)
+        
+        fig.layout.yaxis.tickformat = '0%'
+
+        # Add plot to the report
+        self.figures.append(fig)
 
     def section_id_table(self) -> None:
         ''' Add a small table associated anonymous labels of sections to their true section ID '''
 
-        output = ''
-        output += "<center><h3> Anonymized section name <=> Section ID </h3>"
-        for i, section_id in enumerate(self.section_ids):
-            output += "Section " + chr(65+i) + "  <=>  " + str(section_id) + "<br>"
+        print(self.section_ids)
+        print(self.dict_all.keys())
+        section_names = [self.dict_all['sections'][id]['title'] for id in self.section_ids]
 
-        output += "</center>"
+        fig = go.Figure(data=[go.Table(header=dict(values=
+                                                    ['Section Name in Report', 
+                                                     'Section Title']),
+                                        cells=dict(values=[self.section_names, section_names],
+                                                    fill_color=[
+                                                        self.table_section_colors
+                                                    ],
+                                                    height=30))])
+        
+        fig.update_layout(height=250+35*len(self.section_ids), font_size=15)
 
-        # Add text to the report
-        self.figures.append(output)
-
+        self.figures.append('<center><h1>Section name to ID key</h1></center>')
+        
+        self.figures.append(fig)
 
     def create_html(self) -> None:
         '''
@@ -601,63 +1520,107 @@ class GradingDashboard:
 
         print('Dashboard complete')
 
+    def get_sorted_LOs(self) -> list:
+        ''' Returns a list of all graded LOs sorted in descending order according to the number of scores in that LO '''
+        # Count the number of scores for each LO
+        lo_score_counts = []
+        for lo_name in self.all_LOs:
+            score_count = 0
+            for section_id in self.section_ids:
+                for student_id in self.grades_dict[section_id]:
+                    for submission_data in self.grades_dict[section_id][student_id]:
+                        if submission_data['learning_outcome'] == lo_name:
+                            score_count += 1
+            lo_score_counts.append(score_count)
+
+        # Sort the lo names according to the number of scores
+        return [LO_name for _, LO_name in sorted(zip(lo_score_counts, self.all_LOs), key=lambda pair: pair[0], reverse=True)]
 
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
-        self.ANOVA_test(False)
+        #self.mann_whitney_grid()
+        #self.prob_of_superiority_grid()
+        self.figures.append("<center><h1>Progress</h1></center>")
+        self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
         self.progress_table()
+        self.LO_progress_table()
+        self.figures.append("<center><h1>Significance tests</h1></center>")
+        self.figures.append("This section will describe the comparisons between sections and their practical and statistical significance.<br>")
+        self.figures.append("For all tests, independence and normality is assumed.<br>")
+        self.ANOVA_test(False)
         self.summary_stats_table()
-        self.figures.append("<center><h1>Student average score distributions</h1></center>")
-        self.boxplots()
-        # Skip the violinplots (kde)
-        # self.violinplots()
+        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
+        self.t_test_grids()
+        self.figures.append("<center><h1>Score distributions</h1></center>")
+        self.scoreavgs_allsections_plot()
+        self.figures.append("<b>- Click or double click the legend on the right to select and deselect different sections</b>")
+        self.boxplots_new()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
-        for lo_name in self.all_LOs:
-            # Skip kde LO plots also
-            #self.LO_kde_plot(lo_name)
+
+        self.LO_stackedbar_plot_all()
+        for lo_name in self.sorted_LOs:
             self.LO_stackedbar_plot(lo_name)
 
-        if self.anonymize:
-            self.section_id_table()
+        self.section_id_table()
+        self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
-    
 
+# Create new file with only portions of fake_data
+def create_data(file_name:str, total_scores:int):
 
-gd = GradingDashboard('fake_data_986100.py', anonymize=True)
+    # Read in data
 
+    # Open the file
+    with open(file_name, 'r', encoding='utf8') as file:
+        data = file.read()
 
-gd.make_full_report()
+    # Dangerous eval call, should test for errors
+    try:
+        dict_all = eval(data)
+    except:
+        raise Exception("text in file not properly formatted dictionary")
 
+    # Edit data in dict variable
+    all_scores_path = []
 
-#section_sizes = np.array([19, 20, 19, 19, 19, 16, 16, 12, 17, 18, 17])
-## Calculate section means and SDs
-#section_means = np.array([3.22, 3.33, 3.35, 3.3, 3.33, 3.3, 3.49, 3.14, 3.29, 3.37, 3.27])
-#section_SDs = np.array([0.22, 0.13, 0.14, 0.15, 0.14, 0.17, 0.19, 0.23, 0.12, 0.20, 0.29])
-#
-## Overall average score and SDs, weighted by number of students
-#overall_mean = sum(section_means * section_sizes)/sum(section_sizes)
-#print(overall_mean)
-#overall_SD = sum(section_SDs * section_sizes)/sum(section_sizes)
-#print(overall_SD)
-#average_section_size = np.mean(section_sizes)
-#
-#p_values = []
-#effect_sizes = []
-## Perform two-tailed difference of means test
-#for i in range(len(section_means)):
-#    # Standard error
-#    standard_err = np.sqrt(section_SDs[i]**2 / section_sizes[i] + \
-#                            overall_SD**2 / average_section_size)
-#    
-#    # Effect size, and t-statistic
-#    effect_sizes.append((section_means[i] - overall_mean)/overall_SD)
-#    t_stat = (section_means[i] - overall_mean)/standard_err
-#    
-#    # degrees of freedom
-#    df = min(average_section_size-1, section_sizes[i]-1)
-#
-#    p_values.append(sts.t.sf(abs(t_stat), df) * 2)
-#
-#print(p_values)
-#print(effect_sizes)
+    # Get all score paths
+    for section_ID in dict_all.keys():
+        for student_ID in dict_all[section_ID].keys():
+            for score_index in range(len(dict_all[section_ID][student_ID])):
+                all_scores_path.append((section_ID, student_ID, score_index))
+        
+    rnd.seed(13) # 10
+    chosen_scores = rnd.sample(all_scores_path, total_scores)
+    #print(chosen_scores)
+    new_dict = {}
+
+    for score_path in chosen_scores:
+        if score_path[0] in new_dict.keys():
+            if score_path[1] in new_dict[score_path[0]].keys():
+                # Add the score data to the list, if the list already exists
+                new_dict[score_path[0]][score_path[1]].append(dict_all[score_path[0]][score_path[1]][score_path[2]])
+            else:
+                # This student doesn't exist yet, add it with a list containing the score data
+                new_dict[score_path[0]][score_path[1]] = [dict_all[score_path[0]][score_path[1]][score_path[2]]]
+        else:
+            # This section doesn't exist yet, add it with the correct student and data list
+            new_dict[score_path[0]] = {score_path[1]: [dict_all[score_path[0]][score_path[1]][score_path[2]]]}
+
+    # Write dictionary into new file
+    new_file_name = 'fake_data_new.py'
+
+    with open(new_file_name, 'w', encoding='utf8') as file:
+        file.write(str(new_dict))
+        
+    return new_file_name
+
+def create_report():
+    print("Creating report")
+    gd = GradingDashboard('grade_data.py', anonymize=False, target_scorecount=6)
+    gd.make_full_report()
+
+    print("Opening report")
+
+    dir_path = pathlib.Path(__file__).parent.resolve()
+    os.system(f'start file:///{dir_path}/grading_dashboard.html')
