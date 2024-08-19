@@ -225,7 +225,7 @@ class GradingDashboard:
                                       {"name": "Sort by wordcount", "col_i": 3}]
                     ],
                     direction = "down",
-                    y = 1.15,
+                    y = 1.3,
                     x = 1
                 )],
                 height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
@@ -334,7 +334,7 @@ class GradingDashboard:
                             ]
                     ],
                     direction = "down",
-                    y = 1.15,
+                    y = 1.2,
                     x = 1
                 )],
                 height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
@@ -474,7 +474,6 @@ class GradingDashboard:
         
                 
         # Create table
-        
         data = [self.section_names[:],
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
@@ -556,7 +555,7 @@ class GradingDashboard:
                                       {"name": "Sort by avg effect size", "col_i": 4}]
                     ],
                     direction = "down",
-                    y = 1.15,
+                    y = 1.2,
                     x = 1
                 )],
                 height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
