@@ -106,11 +106,6 @@ class GradingDashboard:
                     self.all_avgscores[-1].append(np.mean(student_scores))
             else:
                 self.all_avgscores[-1].append(np.nan)
-
-        #print("all_scores:", self.all_scores)
-        #print("all_avgscores:", self.all_avgscores)
-        #print("All sections with something", self.section_ids)
-        #print("All sections with scores", self.section_ids_w_scores)
         
         # Set up the colors for the different sections
         self.section_colors = disc_colors.Dark24[:len(self.section_ids)]
@@ -1348,8 +1343,6 @@ class GradingDashboard:
     def section_id_table(self) -> None:
         ''' A small table associated anonymous labels of sections to their true section title '''
 
-        print(self.section_ids)
-        print(self.dict_all.keys())
         section_names = [self.dict_all['sections'][id]['title'] for id in self.section_ids]
 
         fig = go.Figure(data=[go.Table(header=dict(values=
@@ -1421,8 +1414,7 @@ class GradingDashboard:
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
-        #self.mann_whitney_grid()
-        #self.prob_of_superiority_grid()
+        self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}</h1></center>")
         self.figures.append("<center><h1>Progress</h1></center>")
         self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
         self.progress_table()
