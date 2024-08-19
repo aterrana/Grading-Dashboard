@@ -240,9 +240,9 @@ class GradingDashboard:
         self.figures.append(fig)
 
     def LO_progress_table(self) -> None:
-        ''' Produces table with progress indication, adds it to report '''
+        ''' Produces table with LO score-count progress, adds it to report '''
 
-        # Count number of scores and comments
+        # Count number of scores for each LO
         lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.sorted_LOs))]
         for lo_index, lo_name in enumerate(self.sorted_LOs):
             for section_index, section_id in enumerate(self.section_ids):
@@ -263,7 +263,7 @@ class GradingDashboard:
         lo_color_indices = [[] for _ in range(len(self.sorted_LOs))]
         for lo_index in range(len(self.all_LOs)):
 
-            # If the max count equals the min count, display the average color for all
+            # If the max count equals the min count, display the average color for all cells
             if max(lo_scores_counts[lo_index]) == min(lo_scores_counts[lo_index]):
                 lo_color_indices[lo_index] = [25] * len(self.section_ids)
             else:
@@ -290,60 +290,94 @@ class GradingDashboard:
                 column_names.append('Score count in ' + lo_name)
         
         column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
-        #tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
         
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
-        
-        # Create table figure, with appropriate colors
-        fig = go.Figure(data=[go.Table(header=dict(values=column_names),
-                                        cells=dict(values=data,
-                                                    fill_color=column_colors,
-                                                    height=30))])
-        
-        # Make a dataframe of the data, it's more easily sortable
-        df = pd.DataFrame(data).T.sort_values(0).T
-
-        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
-
-        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
-        total_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
-
-        lo_color_dicts = [{section_id:column_colors[lo_name_i+2][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(self.sorted_LOs))]
-
-        #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
-        #                  {"name": "Sort by total scores", "col_i": 1}]
-        #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
-        ## Create sorting drop-down menu
-        fig.update_layout(
-            updatemenus=[dict(
-                    buttons= [dict(
-                            method= "restyle",
-                            label= selection["name"],
-                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
-                                                "fill": dict(color=[
-                                                        [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
-                                                        [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
-                                                        *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
-                                                "height": 30}}, [0]]
-                            )
-                            for selection in [
-                                {"name": "Sort by section name", "col_i": 0},
-                                {"name": "Sort by total scores", "col_i": 1},
-                                *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(self.sorted_LOs)]
-                            ]
-                    ],
-                    direction = "down",
-                    y = 1.2,
-                    x = 1
-                )],
-                height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
-                font_size=15)
         
         self.figures.append('<center><h2>LO grading progress</h2></center>')
         self.figures.append('This table show how many scores each section has given, in total and for each LO')
         
-        self.figures.append(fig)
+        data_copy = data[:]
+        column_colors_copy = column_colors[:]
+        column_names_copy = column_names[:]
+        table_width = 5
+        if len(data_copy) >= table_width:
+            
+            split_data = []
+            split_column_colors = []
+            split_column_names = []
+            
+            while len(data_copy) >= table_width:
+                split_data.append(data_copy[:table_width])
+                split_column_colors.append(column_colors_copy[:table_width])
+                split_column_names.append(column_names_copy[:table_width])
+
+                data_copy = data_copy[table_width:]
+                data_copy.insert(0, data[0])
+                column_colors_copy = column_colors_copy[table_width:]
+                column_colors_copy.insert(0, column_colors[0])
+                column_names_copy = column_names_copy[table_width:]
+                column_names_copy.insert(0, column_names[0])
+            
+            split_data.append(data_copy[:])
+            split_column_colors.append(column_colors_copy[:])
+            split_column_names.append(column_names_copy[:])
+
+
+        else:
+            split_data = [data]
+            split_column_colors = [column_colors]
+            split_column_names = [column_names]
+        
+        for j, data in enumerate(split_data):
+            # Create table figure, with appropriate colors
+            fig = go.Figure(data=[go.Table(header=dict(values=split_column_names[j]),
+                                            cells=dict(values=data,
+                                                        fill_color=split_column_colors[j],
+                                                        height=30))])
+            
+            # Make a dataframe of the data, it's more easily sortable
+            df = pd.DataFrame(data).T.sort_values(0).T
+
+            # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+            section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+
+            #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
+            total_color_dict = {section_id:split_column_colors[j][1][i] for i, section_id in enumerate(self.section_names)}
+
+            lo_color_dicts = [{section_id:split_column_colors[j][lo_name_i+1][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(data)-1)]
+
+            #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
+            #                  {"name": "Sort by total scores", "col_i": 1}]
+            #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
+            ## Create sorting drop-down menu
+            fig.update_layout(
+                updatemenus=[dict(
+                        buttons= [dict(
+                                method= "restyle",
+                                label= selection["name"],
+                                args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
+                                                    "fill": dict(color=[
+                                                            [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                            [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                            *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
+                                                    "height": 30}}, [0]]
+                                )
+                                for selection in [
+                                    {"name": "Sort by section name", "col_i": 0},
+                                    {"name": f"Sort by {'total scores' if j==0 else split_column_names[j][1].split(' ')[-1]}", "col_i": 1},
+                                    *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(split_column_names[j][2:])]
+                                ]
+                        ],
+                        direction = "down",
+                        y = 1.26,
+                        x = 1
+                    )],
+                    height=110+28*len(self.section_ids),# * (1 if self.anonymize else 2),
+                    font_size=15,
+                    margin = dict(t=0, b=0))
+            
+            
+            self.figures.append(fig)
 
     def summary_stats_table(self) -> None:
         ''' Produces table with summary statistics, adds it to report '''
