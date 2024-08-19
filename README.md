@@ -9,11 +9,8 @@ This project is an assignment grading dashboard for course leads, so that they c
 ```
 pip install plotly==5.23.0
 ```
-```pip install requests-futures```
 ```
-function test() {
-  console.log("This code will have a copy button to the right of it");
-}
+pip install requests-futures
 ```
 
 # How to use
