@@ -5,9 +5,9 @@ This project is an assignment grading dashboard for course leads, so that they c
 1. [Download] the "Minerva Assignment Data-grabber" chrome extension.
 2. [Download](https://github.com/g-nilsson/Grading-Dashboard/archive/refs/heads/main.zip) this project, remember the path to the folder after you've unzipped it.
 3. If you haven't already, [install python](https://www.python.org/downloads/)
-4. Install the python libraries, plotly & requests-futures by pasting the following commands in your command prompt
-'pip install plotly==5.23.0'
-'pip install requests-futures'
+4. Install the python libraries, plotly & requests-futures by pasting the following commands in your command prompt <br>
+```pip install plotly==5.23.0```<br>
+```pip install requests-futures```
 
 # How to use
 1. Navigate to an assignment page
