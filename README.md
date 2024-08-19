@@ -8,6 +8,11 @@ This project is an assignment grading dashboard for course leads, so that they c
 4. Install the python libraries, plotly & requests-futures by pasting the following commands in your command prompt <br>
 ```pip install plotly==5.23.0```<br>
 ```pip install requests-futures```
+```
+function test() {
+  console.log("This code will have a copy button to the right of it");
+}
+```
 
 # How to use
 1. Navigate to an assignment page
