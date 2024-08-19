@@ -1414,7 +1414,7 @@ class GradingDashboard:
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
-        self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}</h1></center>")
+        self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
         self.figures.append("<center><h1>Progress</h1></center>")
         self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
         self.progress_table()

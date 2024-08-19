@@ -137,12 +137,14 @@ all_assignments = dict(zip(sections.keys(), get_futures_with_retry(
     http_headers)))
 
 # In each section, find the Forum assignment id matching `course_builder_id`
+assignment_title = ''
 for section_id in sections.keys():
     result = all_assignments[section_id]
     all_assignments[section_id] = None
     for assignment in result['results']:
         if assignment['num'] == course_builder_id:
             all_assignments[section_id] = assignment['id']
+            assignment_title = assignment['title']
 
 # Step 6: Fetch the grading data for the assignment in each section
 all_assignments = dict(zip(
@@ -179,6 +181,7 @@ output = {
     'course': {
         'id': course_id,
         'code': course_code},
+    'assignment_title': assignment_title,
     'sections': sections,  # {section_id: {'title': TTh name (11am), 'student_count': ...}}
     'grades': grades}  # {section_id: {student_id: grade_data}}
 
