@@ -14,11 +14,11 @@ pip install requests-futures
 ```
 
 # How to use
-1. (Optional) Pin the chrome extension
-![Pinning Extension](https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif)
+1. (Optional) Pin the chrome extension<br>
+<img src="https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif" width="40" />
 3. Navigate to an assignment page in Forum (of the format https://forum.minerva.edu/app/assignments/xxxxxx)
-4. Press the button in the chrome extension popup
-![Using the chrome extension](https://github.com/g-nilsson/public_files/blob/main/using_extension.gif)
+4. Press the button in the chrome extension popup<br>
+<img src="https://github.com/g-nilsson/public_files/blob/main/using_extension.gif" width="40" />
 
 # Functionality
 The script will create an html file containing interactive graphs and statistical results for the given assignment across all sections.
