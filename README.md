@@ -16,12 +16,12 @@ pip install requests-futures
 # How to use
 1. (Optional) Pin the chrome extension<br>
 <p align="center">
-<img src="https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif" width="120" />
+<img src="https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif" width="360" />
 </p>
 3. Navigate to an assignment page in Forum (of the format https://forum.minerva.edu/app/assignments/xxxxxx)
 4. Press the button in the chrome extension popup<br>
 <p align="center">
-<img src="https://github.com/g-nilsson/public_files/blob/main/using_extension.gif" width="120" />
+<img src="https://github.com/g-nilsson/public_files/blob/main/using_extension.gif" width="360" />
 </p>
 
 # Functionality
