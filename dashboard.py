@@ -1197,12 +1197,6 @@ class GradingDashboard:
             hovermode='x'
         )
 
-
-        with open('only_boxplot.html', 'a') as f:
-            # Remove contents
-            f.truncate(0)
-            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
-
         # Add plot to the report
         self.figures.append(fig)
 
