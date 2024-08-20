@@ -18,16 +18,16 @@ pip install requests-futures
 <p align="center">
 <img src="https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif" width="280" />
 </p>
-3. Navigate to an assignment page in Forum (of the format https://forum.minerva.edu/app/assignments/xxxxxx)<br>
-4. Press the button in the chrome extension popup<br>
+2. Navigate to an assignment page in Forum (of the format https://forum.minerva.edu/app/assignments/xxxxxx)<br>
+3. Press the button in the chrome extension popup<br>
 <p align="center">
 <img src="https://github.com/g-nilsson/public_files/blob/main/using_extension.gif" width="600" />
-</p><br>
-5. Open your command prompt (search cmd in Windows, and terminal on Mac)<br>
-6. In your command prompt, navigate to the unzipped folder you downloaded in step 2 of "How to set up"
-7. Paste the command that is already on your clipboard by pressing ctrl+V (Windows) or command+V
-8. Press enter
-
+</p>
+4. Open your command prompt (search cmd in Windows, and terminal on Mac)<br>
+5. In your command prompt, navigate to the unzipped folder you downloaded in step 2 of "How to set up"<br>
+6. Paste the command that is already on your clipboard by pressing ctrl+V (Windows) or command+V<br>
+7. Press enter<br>
+<br>
 The code should now run, and the Grading Dashboard should open, automatically. This might take a second.
 
 # Functionality
