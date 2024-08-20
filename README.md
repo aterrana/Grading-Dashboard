@@ -26,12 +26,12 @@ pip install requests-futures
 4. Open your command prompt (search cmd in Windows, and terminal on Mac)<br>
 5. In your command prompt, navigate to the unzipped folder you downloaded in step 2 of "How to set up"<br>
 <p align="center">
-<img src="https://github.com/g-nilsson/public_files/blob/main/using_cd.gif" width="280" />
+<img src="https://github.com/g-nilsson/public_files/blob/main/using_cd.gif" width="600" />
 </p>
 6. Paste the command that is already on your clipboard by pressing ctrl+V (Windows) or command+V<br>
 7. Press enter<br>
 <p align="center">
-<img src="https://github.com/g-nilsson/public_files/blob/main/using_grading_dashboard.gif" width="280" />
+<img src="https://github.com/g-nilsson/public_files/blob/main/using_grading_dashboard.gif" width="600" />
 </p>
 <br>
 The code should now run, and the Grading Dashboard should open, automatically. This might take a second.
