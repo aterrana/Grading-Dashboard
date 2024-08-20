@@ -15,7 +15,6 @@ import pathlib
 
 import pandas as pd
 
-
 class GradingDashboard:
     '''
     Class to manage navigation and visualisation of a given grade_data file.
@@ -107,11 +106,6 @@ class GradingDashboard:
                     self.all_avgscores[-1].append(np.mean(student_scores))
             else:
                 self.all_avgscores[-1].append(np.nan)
-
-        #print("all_scores:", self.all_scores)
-        #print("all_avgscores:", self.all_avgscores)
-        #print("All sections with something", self.section_ids)
-        #print("All sections with scores", self.section_ids_w_scores)
         
         # Set up the colors for the different sections
         self.section_colors = disc_colors.Dark24[:len(self.section_ids)]
@@ -231,7 +225,7 @@ class GradingDashboard:
                                       {"name": "Sort by wordcount", "col_i": 3}]
                     ],
                     direction = "down",
-                    y = 1.15,
+                    y = 1.3,
                     x = 1
                 )],
                 height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
@@ -246,9 +240,9 @@ class GradingDashboard:
         self.figures.append(fig)
 
     def LO_progress_table(self) -> None:
-        ''' Produces table with progress indication, adds it to report '''
+        ''' Produces table with LO score-count progress, adds it to report '''
 
-        # Count number of scores and comments
+        # Count number of scores for each LO
         lo_scores_counts = [[0 for _ in range(len(self.section_ids))] for _ in range(len(self.sorted_LOs))]
         for lo_index, lo_name in enumerate(self.sorted_LOs):
             for section_index, section_id in enumerate(self.section_ids):
@@ -269,7 +263,7 @@ class GradingDashboard:
         lo_color_indices = [[] for _ in range(len(self.sorted_LOs))]
         for lo_index in range(len(self.all_LOs)):
 
-            # If the max count equals the min count, display the average color for all
+            # If the max count equals the min count, display the average color for all cells
             if max(lo_scores_counts[lo_index]) == min(lo_scores_counts[lo_index]):
                 lo_color_indices[lo_index] = [25] * len(self.section_ids)
             else:
@@ -296,60 +290,94 @@ class GradingDashboard:
                 column_names.append('Score count in ' + lo_name)
         
         column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
-        #tot_lo_colors = np.array(greys_colorscale)[tot_lo_color_indices]
         
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
-        
-        # Create table figure, with appropriate colors
-        fig = go.Figure(data=[go.Table(header=dict(values=column_names),
-                                        cells=dict(values=data,
-                                                    fill_color=column_colors,
-                                                    height=30))])
-        
-        # Make a dataframe of the data, it's more easily sortable
-        df = pd.DataFrame(data).T.sort_values(0).T
-
-        # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
-        section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
-
-        #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
-        total_color_dict = {section_id:column_colors[1][i] for i, section_id in enumerate(self.section_names)}
-
-        lo_color_dicts = [{section_id:column_colors[lo_name_i+2][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(self.sorted_LOs))]
-
-        #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
-        #                  {"name": "Sort by total scores", "col_i": 1}]
-        #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
-        ## Create sorting drop-down menu
-        fig.update_layout(
-            updatemenus=[dict(
-                    buttons= [dict(
-                            method= "restyle",
-                            label= selection["name"],
-                            args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
-                                                "fill": dict(color=[
-                                                        [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
-                                                        [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
-                                                        *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
-                                                "height": 30}}, [0]]
-                            )
-                            for selection in [
-                                {"name": "Sort by section name", "col_i": 0},
-                                {"name": "Sort by total scores", "col_i": 1},
-                                *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(self.sorted_LOs)]
-                            ]
-                    ],
-                    direction = "down",
-                    y = 1.15,
-                    x = 1
-                )],
-                height=300+29*len(self.section_ids),# * (1 if self.anonymize else 2),
-                font_size=15)
         
         self.figures.append('<center><h2>LO grading progress</h2></center>')
         self.figures.append('This table show how many scores each section has given, in total and for each LO')
         
-        self.figures.append(fig)
+        data_copy = data[:]
+        column_colors_copy = column_colors[:]
+        column_names_copy = column_names[:]
+        table_width = 5
+        if len(data_copy) >= table_width:
+            
+            split_data = []
+            split_column_colors = []
+            split_column_names = []
+            
+            while len(data_copy) >= table_width:
+                split_data.append(data_copy[:table_width])
+                split_column_colors.append(column_colors_copy[:table_width])
+                split_column_names.append(column_names_copy[:table_width])
+
+                data_copy = data_copy[table_width:]
+                data_copy.insert(0, data[0])
+                column_colors_copy = column_colors_copy[table_width:]
+                column_colors_copy.insert(0, column_colors[0])
+                column_names_copy = column_names_copy[table_width:]
+                column_names_copy.insert(0, column_names[0])
+            
+            split_data.append(data_copy[:])
+            split_column_colors.append(column_colors_copy[:])
+            split_column_names.append(column_names_copy[:])
+
+
+        else:
+            split_data = [data]
+            split_column_colors = [column_colors]
+            split_column_names = [column_names]
+        
+        for j, data in enumerate(split_data):
+            # Create table figure, with appropriate colors
+            fig = go.Figure(data=[go.Table(header=dict(values=split_column_names[j]),
+                                            cells=dict(values=data,
+                                                        fill_color=split_column_colors[j],
+                                                        height=30))])
+            
+            # Make a dataframe of the data, it's more easily sortable
+            df = pd.DataFrame(data).T.sort_values(0).T
+
+            # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
+            section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
+
+            #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
+            total_color_dict = {section_id:split_column_colors[j][1][i] for i, section_id in enumerate(self.section_names)}
+
+            lo_color_dicts = [{section_id:split_column_colors[j][lo_name_i+1][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(data)-1)]
+
+            #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
+            #                  {"name": "Sort by total scores", "col_i": 1}]
+            #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
+            ## Create sorting drop-down menu
+            fig.update_layout(
+                updatemenus=[dict(
+                        buttons= [dict(
+                                method= "restyle",
+                                label= selection["name"],
+                                args= [{"cells": {"values": df.T.sort_values(selection["col_i"], ascending=selection['col_i']==0).T.values, # Sort all values according to selection
+                                                    "fill": dict(color=[
+                                                            [section_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]],
+                                                            [total_color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]], # Ensure all colors are with the correct cell
+                                                            *[[color_dict[section_id] for section_id in df.T.sort_values(selection["col_i"], ascending=selection["col_i"]==0).T.values[0]] for color_dict in lo_color_dicts]]),
+                                                    "height": 30}}, [0]]
+                                )
+                                for selection in [
+                                    {"name": "Sort by section name", "col_i": 0},
+                                    {"name": f"Sort by {'total scores' if j==0 else split_column_names[j][1].split(' ')[-1]}", "col_i": 1},
+                                    *[{"name": f"Sort by {lo_name}", "col_i": i+2} for i, lo_name in enumerate(split_column_names[j][2:])]
+                                ]
+                        ],
+                        direction = "down",
+                        y = 1.26,
+                        x = 1
+                    )],
+                    height=110+28*len(self.section_ids),# * (1 if self.anonymize else 2),
+                    font_size=15,
+                    margin = dict(t=0, b=0))
+            
+            
+            self.figures.append(fig)
 
     def summary_stats_table(self) -> None:
         ''' Produces table with summary statistics, adds it to report '''
@@ -480,7 +508,6 @@ class GradingDashboard:
         
                 
         # Create table
-        
         data = [self.section_names[:],
                 [round(val,3) for val in self.section_means],
                 [round(val,3) for val in self.section_SDs],
@@ -562,7 +589,7 @@ class GradingDashboard:
                                       {"name": "Sort by avg effect size", "col_i": 4}]
                     ],
                     direction = "down",
-                    y = 1.15,
+                    y = 1.2,
                     x = 1
                 )],
                 height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
@@ -983,6 +1010,7 @@ class GradingDashboard:
                 break
                 
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
+        fig.add_vline(x=np.median(all_scores_flat), annotation_text='Median', annotation_position="bottom right", fillcolor='orange')
         
         fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
         # Count total number of students
@@ -1026,12 +1054,18 @@ class GradingDashboard:
             # Small p-value means statistically significant
             output += "<center><h2> ANOVA Results (global significance test)</h2></center>"
             output += "ANOVA is a difference of means test for multiple groups. It gives a global p-value, which if significant, means that it's likely that a students average score is effected by the students section, in general.<br>"
-            output += "<h3>P-value: " + str(round(p_value, 3)) + "</h3>"
+            output += "Note that ANOVA assumes normality, and equal variance in each group. Especially the second criteria could be false for student scores, and if so, ANOVA results should not be trusted blindly."
+            rounded_pval_string = str(round(p_value, 4))
+            pval_percentage_string = str(round(p_value*100, 2))
+            if round(p_value, 4) == 0:
+                rounded_pval_string = "<0.00005"
+                pval_percentage_string = "<0.005"
+            output += "<h3>P-value: " + rounded_pval_string + "</h3>"
             output += "(With significance level = 0.05)<br>"
             if p_value < 0.05:
-                output += "We reject the null hypothesis. At least one section has a different mean than the other groups, with statistical significance. There's a " + str(round(p_value*100, 2)) + "% chance of a Type I error.\n\n"
+                output += "We reject the null hypothesis. The different groups likely don't share the same true mean. There's a " + pval_percentage_string + "% chance of a Type I error.\n\n"
             else:
-                output += "We don't reject the null hypothesis. We don't have statistically significant evidence that any group has a mean different from the others.\n\n"
+                output += "We don't reject the null hypothesis. We don't have statistically significant evidence that the groups have different true means.\n\n"
             # F-statistic: Variation between sample means / Variation within samples
             # Large F-statistic means that there is difference somewhere
             output += "<h3>F-statistic: " + str(round(f_stat, 3)) + "</h3>"
@@ -1047,129 +1081,6 @@ class GradingDashboard:
             self.figures.append(output)
 
     def boxplots(self, averages=True) -> None:
-        ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
-
-        # Whether considering student average scores, or all individual LO/HC scores
-        # Deepcopy because we will edit local copy.
-        if averages:
-            scores = copy.deepcopy(self.all_avgscores)
-        else:
-            scores = copy.deepcopy(self.all_scores)
-
-        fig = go.Figure()
-
-        # Flatten scores list for plotting
-        for section_scores in scores:
-            # We need 5 datapoints for the mean and SD plotting to work
-            # So if fewer, add None to make the difference
-            if len(section_scores) < 5:
-                diff = 5 - len(section_scores)
-                section_scores.extend([None] * diff)
-
-        # Flatten the scores, now including None
-        flat_scores = [score for lst in scores for score in lst]
-        
-
-        # x_mapping describes which datapoint belongs to which section
-        x_mapping = []
-        for i, section_name in enumerate(self.section_names):
-            x_mapping.extend([section_name] * len(scores[i]))
-
-        
-        # Boxplot for scores, displaying quartiles
-        #fig.add_trace(go.Box(
-        #    y=flat_scores,
-        #    x=x_mapping,
-        #    name='4 Quartiles',
-        #    quartilemethod="inclusive",
-        #    fillcolor=self.section_colors[i],
-        #    line=dict(color='black') # self.section_colors
-        #))
-
-        # For a given section in this list,
-        # All datapoints will be at the mean except
-        # 2 datapoints which will be +1 and -1 SD.
-        means_and_SDs = []
-
-        # calcuate means and SDs
-        for section_scores in scores:
-            filtered_list = [score for score in section_scores if score is not None]
-            # If there's any scores in this section
-            if len(filtered_list) > 0:
-                mean = np.mean(filtered_list)
-                std_dev = np.std(filtered_list)
-                means_and_SDs.append(mean-std_dev)
-                means_and_SDs.append(mean+std_dev)
-
-                # Fill the rest of the section with the mean
-                remaining_count = len(section_scores) - 2
-                means_and_SDs.extend([mean] * remaining_count)
-            # There are no scores in this section yet
-            else:
-                means_and_SDs.extend([None]*5)
-
-        for i, group in enumerate(self.section_names):
-            lst = [y_val for y_val, x_val in zip(flat_scores, x_mapping) if x_val == group]
-            x_lst = [[group] * len(scores[i]),['4 Quartiles'] * len(scores[i])]
-            fig.add_trace(go.Box(
-                y=scores[i],
-                x=x_lst,
-                #x=[i-0.2] * len(lst),
-                name=group,
-                marker_color=self.section_colors[i],
-                #name='4 Quartiles',
-                legendgroup=group,
-                #legendgroup='4 Quartiles',
-                #legendgrouptitle_text=group,
-                quartilemethod="inclusive",
-                showlegend = True
-            ))
-
-            lst = [y_val for y_val, x_val in zip(means_and_SDs, x_mapping) if x_val == group]
-            x_lst_a = ['4 Quartiles', 'Mean & ±1 SD'] * len(self.section_names)
-            x_lst_b = [[name] * 2 for name in self.section_names]
-            x_lst = [x_lst_a, x_lst_b]
-
-            x_lst = [[group] * 2, ['4 Quartiles', 'Mean & ±1 SD']]
-
-            x_lst = [[group] * len(scores[i]), ['Mean & ±1 SD'] * len(scores[i])]
-            # Boxplot only displaying mean and SDs
-            fig.add_trace(go.Box(
-                y=lst,
-                x=x_lst,
-                #x=[i+0.2] * len(lst),
-                name=group,
-                #name='Mean & ±1 SD',
-                #legendgroup='Mean & ±1 SD',
-                legendgroup=group,
-                #legendgrouptitle_text=group,
-                marker_color='black', 
-                quartilemethod="inclusive",
-                boxpoints=False,
-                showlegend = False
-            )) 
-
-
-
-        fig.update_layout(
-            title='<b>Distribution of average score per section</b><br>Box plot, colored boxplots are quartiles, black lines are mean +- 1 SD',
-            xaxis_title='Section',
-            yaxis_title='Scores',
-            height=800,
-            legend=dict(groupclick="togglegroup")
-            #boxmode='group'
-        )
-
-
-        with open('only_boxplot.html', 'a') as f:
-            # Remove contents
-            f.truncate(0)
-            f.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
-
-        # Add plot to the report
-        self.figures.append(fig)
-
-    def boxplots_new(self, averages=True) -> None:
         ''' Creates side by side boxplots, together with jittered scatterplots displaying student average scores '''
 
         # Whether considering student average scores, or all individual LO/HC scores
@@ -1464,10 +1375,8 @@ class GradingDashboard:
         self.figures.append(fig)
 
     def section_id_table(self) -> None:
-        ''' Add a small table associated anonymous labels of sections to their true section ID '''
+        ''' A small table associated anonymous labels of sections to their true section title '''
 
-        print(self.section_ids)
-        print(self.dict_all.keys())
         section_names = [self.dict_all['sections'][id]['title'] for id in self.section_ids]
 
         fig = go.Figure(data=[go.Table(header=dict(values=
@@ -1539,8 +1448,7 @@ class GradingDashboard:
     def make_full_report(self) -> None:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
-        #self.mann_whitney_grid()
-        #self.prob_of_superiority_grid()
+        self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
         self.figures.append("<center><h1>Progress</h1></center>")
         self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
         self.progress_table()
@@ -1555,7 +1463,7 @@ class GradingDashboard:
         self.figures.append("<center><h1>Score distributions</h1></center>")
         self.scoreavgs_allsections_plot()
         self.figures.append("<b>- Click or double click the legend on the right to select and deselect different sections</b>")
-        self.boxplots_new()
+        self.boxplots()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
         self.LO_stackedbar_plot_all()
@@ -1623,4 +1531,5 @@ def create_report():
     print("Opening report")
 
     dir_path = pathlib.Path(__file__).parent.resolve()
-    os.system(f'start file:///{dir_path}/grading_dashboard.html')
+    # Make sure this works on a mac as well, might need to do .as_posix() at least
+    os.startfile(f'{dir_path}\grading_dashboard.html')
