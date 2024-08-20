@@ -2,7 +2,7 @@
 This project is an assignment grading dashboard for course leads, so that they can import the current grading data for a given assignment (across all active sections of the course) and observe differences in grading patterns between sections.
 
 # How to set up
-1. [Download] the "Minerva Assignment Data-grabber" chrome extension.
+1. [Download](https://chromewebstore.google.com/detail/minerva-assignment-data-g/afmncekkkklpkommcpkgiielaoahiiin) the "Minerva Assignment Data-grabber" chrome extension.
 2. [Download](https://github.com/g-nilsson/Grading-Dashboard/archive/refs/heads/main.zip) this project, remember the path to the folder after you've unzipped it.
 3. If you haven't already, [install python](https://www.python.org/downloads/)
 4. Install the python libraries, plotly & requests-futures by pasting the following commands in your command prompt <br>
