@@ -1010,6 +1010,7 @@ class GradingDashboard:
                 break
                 
         fig.add_vline(x=np.mean(all_scores_flat), annotation_text='Mean')
+        fig.add_vline(x=np.median(all_scores_flat), annotation_text='Median', annotation_position="bottom right", fillcolor='orange')
         
         fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
         # Count total number of students
