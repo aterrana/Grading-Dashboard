@@ -189,7 +189,29 @@ with open("grade_data.py", 'w', encoding="utf-8") as file:
     file.write(str(output))
 print("Grade data collected")
 
-dashboard.create_report()
+while True:
+    anon_ans_str = input('Do you want the sections to have anonymized names in the report? "Section A" instead of "Lastname, MW@11:00AM City" (Y/N)\n').upper().strip()
+    if anon_ans_str == 'Y' or anon_ans_str == 'YES':
+        anon_answer = True
+        break
+    elif anon_ans_str == 'N' or anon_ans_str == 'NO':
+        anon_answer = False
+        break
+    else:
+        print("Please input either 'y'/'yes' for yes, or 'n'/'no' for no\n")
+
+print()
+
+while True:
+    target_score_ans_str = input('What is the target number of scores for each student, for this assignment?\n').strip()
+    try:
+        target_score = int(target_score_ans_str)
+        assert target_score > 0
+        break
+    except:
+        print("Please input a whole number that is larger than 0")
+
+dashboard.create_report(anon_answer, target_score)
 
 '''
 # Step 7 (optional): Anonymize the data

@@ -63,7 +63,7 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
+            self.section_names = [self.dict_all['sections'][section_id]['title'] for section_id in self.section_ids]
             self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
@@ -1517,9 +1517,9 @@ def create_data(file_name:str, total_scores:int):
         
     return new_file_name
 
-def create_report():
+def create_report(anonymize, target_scorecount):
     print("Creating report")
-    gd = GradingDashboard('grade_data.py', anonymize=False, target_scorecount=6)
+    gd = GradingDashboard('grade_data.py', anonymize=anonymize, target_scorecount=target_scorecount)
     gd.make_full_report()
 
     print("Opening report")
