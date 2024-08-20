@@ -63,7 +63,7 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [self.dict_all['sections'][section_id]['title'] for section_id in self.section_ids]
+            self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
             self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
@@ -228,7 +228,7 @@ class GradingDashboard:
                     y = 1.3,
                     x = 1
                 )],
-                height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=270+29*len(self.section_ids) * (1 if self.anonymize else 2.1),
                 font_size=15)
         
         self.figures.append('<center><h2>Grading progress summary</h2></center>')
@@ -372,7 +372,7 @@ class GradingDashboard:
                         y = 1.26,
                         x = 1
                     )],
-                    height=110+28*len(self.section_ids),# * (1 if self.anonymize else 2),
+                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 2.8),
                     font_size=15,
                     margin = dict(t=0, b=0))
             
@@ -592,7 +592,7 @@ class GradingDashboard:
                     y = 1.2,
                     x = 1
                 )],
-                height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=290+30*len(self.section_ids) * (1 if self.anonymize else 3),
                 font_size=15)
 
         self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
@@ -1464,7 +1464,8 @@ class GradingDashboard:
         for lo_name in self.sorted_LOs:
             self.LO_stackedbar_plot(lo_name)
 
-        self.section_id_table()
+        if self.anonymize:
+            self.section_id_table()
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
@@ -1527,3 +1528,7 @@ def create_report(anonymize, target_scorecount):
     dir_path = pathlib.Path(__file__).parent.resolve()
     # Make sure this works on a mac as well, might need to do .as_posix() at least
     os.startfile(f'{dir_path}\grading_dashboard.html')
+
+    # Clearing the grade_data file to not accidentally publish any grading data to the github repo
+    with open("grade_data.py", 'w', encoding="utf-8") as file:
+        file.write("")
