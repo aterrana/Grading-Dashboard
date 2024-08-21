@@ -63,7 +63,7 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
+            self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
             self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
@@ -228,7 +228,7 @@ class GradingDashboard:
                     y = 1.3,
                     x = 1
                 )],
-                height=270+29*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=270+29*len(self.section_ids) * (1 if self.anonymize else 2.1),
                 font_size=15)
         
         self.figures.append('<center><h2>Grading progress summary</h2></center>')
@@ -372,7 +372,7 @@ class GradingDashboard:
                         y = 1.26,
                         x = 1
                     )],
-                    height=110+28*len(self.section_ids),# * (1 if self.anonymize else 2),
+                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 2.8),
                     font_size=15,
                     margin = dict(t=0, b=0))
             
@@ -396,6 +396,7 @@ class GradingDashboard:
 
         signif_count = np.zeros(len(self.section_names), int)
         cohens_d_vals = np.zeros(len(self.section_names), float)
+
         # For each group pair
         for a_i in range(len(self.section_names)):
             for b_i in range(a_i+1, len(self.section_names)):
@@ -483,17 +484,16 @@ class GradingDashboard:
         
         # precalc the min and max according to absolute value of effect size
         cohens_d_numbers = [0 if np.isnan(val) else val for val in cohens_d_vals]
-        min_abs_effect = min([abs(val) for val in cohens_d_numbers if val != 0])
+        
+        min_abs_effect = min([abs(val) for val in cohens_d_numbers])
         max_abs_effect = max([abs(val) for val in cohens_d_numbers])
 
-        #only_number_effect = [val for val in effect_sizes if isinstance(val, float) or isinstance(val, int)]
         # If all effect sizes are equal
         if max_abs_effect - min_abs_effect == 0 or math.isinf(max_abs_effect):
             effect_color_indices = [0] * len(cohens_d_vals)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
             effect_color_indices = [int(10+60*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) if val != 0 else 0 for val in cohens_d_numbers]
-
 
         # precalc the min and max according to absolute value of effect size
         min_signif_count = min([val for val in signif_count]) 
@@ -592,7 +592,7 @@ class GradingDashboard:
                     y = 1.2,
                     x = 1
                 )],
-                height=290+30*len(self.section_ids),# * (1 if self.anonymize else 2),
+                height=290+30*len(self.section_ids) * (1 if self.anonymize else 3),
                 font_size=15)
 
         self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
@@ -1323,14 +1323,19 @@ class GradingDashboard:
         LO_scores_count = []
 
         for LO_name in self.sorted_LOs:
+            # Add 5 counters for the 5 possible scores
             LO_scores_count.append(np.zeros(5))
+            # For each grade of all students
             for section_id in self.section_ids:
-                # Add 5 counters for the 5 possible scores
                 for student_id in self.grades_dict[section_id]:
                     for submission_data in self.grades_dict[section_id][student_id]:
+                        # If it matches this specific LO
                         if submission_data['learning_outcome'] == LO_name:
                             # Increment the the counter corresponding to the score
-                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                            try:
+                                LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                            except:
+                                ...
             
         LO_scores_perc = [np.zeros(5) for _ in range(len(self.all_LOs))]
         # If there are any scores, convert counts to percentages [0-1]
@@ -1464,7 +1469,8 @@ class GradingDashboard:
         for lo_name in self.sorted_LOs:
             self.LO_stackedbar_plot(lo_name)
 
-        self.section_id_table()
+        if self.anonymize:
+            self.section_id_table()
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
@@ -1517,9 +1523,9 @@ def create_data(file_name:str, total_scores:int):
         
     return new_file_name
 
-def create_report():
+def create_report(anonymize, target_scorecount):
     print("Creating report")
-    gd = GradingDashboard('grade_data.py', anonymize=False, target_scorecount=6)
+    gd = GradingDashboard('grade_data.py', anonymize=anonymize, target_scorecount=target_scorecount)
     gd.make_full_report()
 
     print("Opening report")
@@ -1527,3 +1533,7 @@ def create_report():
     dir_path = pathlib.Path(__file__).parent.resolve()
     # Make sure this works on a mac as well, might need to do .as_posix() at least
     os.startfile(f'{dir_path}\grading_dashboard.html')
+
+    # Clearing the grade_data file to not accidentally publish any grading data to the github repo
+    with open("grade_data.py", 'w', encoding="utf-8") as file:
+        file.write("")
