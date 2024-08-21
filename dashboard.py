@@ -396,6 +396,7 @@ class GradingDashboard:
 
         signif_count = np.zeros(len(self.section_names), int)
         cohens_d_vals = np.zeros(len(self.section_names), float)
+
         # For each group pair
         for a_i in range(len(self.section_names)):
             for b_i in range(a_i+1, len(self.section_names)):
@@ -483,17 +484,16 @@ class GradingDashboard:
         
         # precalc the min and max according to absolute value of effect size
         cohens_d_numbers = [0 if np.isnan(val) else val for val in cohens_d_vals]
-        min_abs_effect = min([abs(val) for val in cohens_d_numbers if val != 0])
+        
+        min_abs_effect = min([abs(val) for val in cohens_d_numbers])
         max_abs_effect = max([abs(val) for val in cohens_d_numbers])
 
-        #only_number_effect = [val for val in effect_sizes if isinstance(val, float) or isinstance(val, int)]
         # If all effect sizes are equal
         if max_abs_effect - min_abs_effect == 0 or math.isinf(max_abs_effect):
             effect_color_indices = [0] * len(cohens_d_vals)
         else:
             # Let effect size vary linearly from 0.0 to 0.7 on yellowred colorscale
             effect_color_indices = [int(10+60*(abs(val)-min_abs_effect)/(max_abs_effect-min_abs_effect)) if val != 0 else 0 for val in cohens_d_numbers]
-
 
         # precalc the min and max according to absolute value of effect size
         min_signif_count = min([val for val in signif_count]) 

@@ -141,6 +141,7 @@ assignment_title = ''
 for section_id in sections.keys():
     result = all_assignments[section_id]
     all_assignments[section_id] = None
+    #print("result['results']", result['results'])
     for assignment in result['results']:
         if assignment['num'] == course_builder_id:
             all_assignments[section_id] = assignment['id']
@@ -185,6 +186,7 @@ output = {
     'sections': sections,  # {section_id: {'title': TTh name (11am), 'student_count': ...}}
     'grades': grades}  # {section_id: {student_id: grade_data}}
 
+# Store the dictionary in a file
 with open("grade_data.py", 'w', encoding="utf-8") as file:
     file.write(str(output))
 print("Grade data collected")
