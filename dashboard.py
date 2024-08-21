@@ -1323,14 +1323,19 @@ class GradingDashboard:
         LO_scores_count = []
 
         for LO_name in self.sorted_LOs:
+            # Add 5 counters for the 5 possible scores
             LO_scores_count.append(np.zeros(5))
+            # For each grade of all students
             for section_id in self.section_ids:
-                # Add 5 counters for the 5 possible scores
                 for student_id in self.grades_dict[section_id]:
                     for submission_data in self.grades_dict[section_id][student_id]:
+                        # If it matches this specific LO
                         if submission_data['learning_outcome'] == LO_name:
                             # Increment the the counter corresponding to the score
-                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                            try:
+                                LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                            except:
+                                ...
             
         LO_scores_perc = [np.zeros(5) for _ in range(len(self.all_LOs))]
         # If there are any scores, convert counts to percentages [0-1]
