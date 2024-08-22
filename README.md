@@ -9,11 +9,8 @@ This project is an assignment grading dashboard for course leads, so that they c
 (If it says "pip: command not found", try typing "pip3" instead of "pip")
 ```
 pip install pandas
-```
-```
+pip install matplotlib
 pip install plotly==5.23.0
-```
-```
 pip install requests-futures
 ```
 
