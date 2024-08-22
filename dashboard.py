@@ -445,7 +445,7 @@ class GradingDashboard:
         colors_normalized = [(pos/100.0, color) for pos, color in colors]
 
         # Create the custom colormap
-        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)
+        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)  # Find another way to do this and remove need for matplotlib
 
         # Create an array of 100 values ranging from 0 to 1
         values = np.linspace(0, 1, 100)
@@ -1541,14 +1541,13 @@ def create_report(anonymize, target_scorecount):
     try:
         os.startfile(f'{dir_path}\grading_dashboard.html')
     except:
-        print("Windows opening failed")
         try:
             file_path = f"{dir_path.as_posix()}/grading_dashboard.html"
             print(file_path)
             os.system(f'open "{file_path}"')
         except:
-            print("Mac opening failed")
-            ...
+            print("Was unable to open the grading dashboard html, the html can be found at:")
+            print(f'{dir_path}\grading_dashboard.html')
 
     # Clearing the grade_data file to not accidentally publish any grading data to the github repo
     with open("grade_data.py", 'w', encoding="utf-8") as file:
