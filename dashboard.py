@@ -282,12 +282,7 @@ class GradingDashboard:
 
         column_names = ['Section name', 'Total scores assigned']
         for lo_name in self.sorted_LOs:
-            # I set this to False now because it looks bad if you make the html window wide,
-            # but leaving logic here if I want to use it later
-            if len(lo_name) > 8 and False:
-                column_names.append('Score count in ' + lo_name[:7] + '- ' + lo_name[7:])
-            else:
-                column_names.append('Score count in ' + lo_name)
+            column_names.append('Score count in ' + lo_name)
         
         column_colors = [self.table_section_colors, np.array(greys_colorscale)[tot_lo_color_indices]]
         
