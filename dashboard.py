@@ -80,7 +80,7 @@ class GradingDashboard:
                 # A sublist for this student
                 self.all_scores[-1].append([])
                 for submission_data in self.grades_dict[section_id][student_id]:
-                    if submission_data['score'] != None:
+                    if submission_data['score'] is not None:
                         # Add score for this specific student
                         self.all_scores[-1][-1].append(submission_data['score'])
                     if submission_data['learning_outcome'] != None:
@@ -445,7 +445,7 @@ class GradingDashboard:
         colors_normalized = [(pos/100.0, color) for pos, color in colors]
 
         # Create the custom colormap
-        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)
+        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)  # Find another way to do this and remove need for matplotlib
 
         # Create an array of 100 values ranging from 0 to 1
         values = np.linspace(0, 1, 100)
@@ -1238,8 +1238,9 @@ class GradingDashboard:
             for student_id in self.grades_dict[section_id]:
                 for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
-                        score_count += 1
-                        LO_scores[-1].append(submission_data['score'])
+                        if submission_data['score'] is not None:
+                            score_count += 1
+                            LO_scores[-1].append(submission_data['score'])
 
         # Skip the plot if there's not enough scores in total
         if score_count < 4:
@@ -1283,7 +1284,10 @@ class GradingDashboard:
                 for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
-                        LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                        try:
+                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                        except:
+                            ...
         
         LO_scores_perc = [np.zeros(5) for _ in range(len(self.section_ids))]
         # If there are any scores, convert counts to percentages [0-1]
@@ -1532,7 +1536,18 @@ def create_report(anonymize, target_scorecount):
 
     dir_path = pathlib.Path(__file__).parent.resolve()
     # Make sure this works on a mac as well, might need to do .as_posix() at least
-    os.startfile(f'{dir_path}\grading_dashboard.html')
+    #os.system("open grading_dashboard.html")
+    #os.system("open " f"{dir_path.as_posix()}/grading_dashboard.html")
+    try:
+        os.startfile(f'{dir_path}\grading_dashboard.html')
+    except:
+        try:
+            file_path = f"{dir_path.as_posix()}/grading_dashboard.html"
+            print(file_path)
+            os.system(f'open "{file_path}"')
+        except:
+            print("Was unable to open the grading dashboard html, the html can be found at:")
+            print(f'{dir_path}\grading_dashboard.html')
 
     # Clearing the grade_data file to not accidentally publish any grading data to the github repo
     with open("grade_data.py", 'w', encoding="utf-8") as file:
