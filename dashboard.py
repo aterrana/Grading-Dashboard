@@ -296,10 +296,16 @@ class GradingDashboard:
         self.figures.append('<center><h2>LO grading progress</h2></center>')
         self.figures.append('This table show how many scores each section has given, in total and for each LO')
         
+        # Split up the data, colors, and names into multiple lists, that go into multiple tables
         data_copy = data[:]
         column_colors_copy = column_colors[:]
         column_names_copy = column_names[:]
-        table_width = 5
+
+        # Figure out how many tables will be needed, and what their width should be
+        max_width = 5
+        num_tables = math.ceil(len(data_copy) / max_width)
+        table_width = math.ceil((len(data_copy) + num_tables-1) / num_tables)
+        
         if len(data_copy) >= table_width:
             
             split_data = []
