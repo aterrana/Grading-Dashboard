@@ -6,12 +6,20 @@ This project is an assignment grading dashboard for course leads, so that they c
 2. [Download](https://github.com/g-nilsson/Grading-Dashboard/archive/refs/heads/main.zip) this project, remember the path to the folder after you've unzipped it.
 3. If you haven't already, [install python](https://www.python.org/downloads/)
 4. Install the python libraries: plotly, and requests-futures, by pasting the following commands in your command prompt <br>
-(If it says "pip: command not found", try typing "pip3" instead of "pip")
 ```
 pip install pandas
 pip install matplotlib
 pip install plotly==5.23.0
 pip install requests-futures
+pip install scipy
+```
+If it says "pip: command not found", try typing "pip3" instead of "pip", try pasting this instead:
+```
+pip3 install pandas
+pip3 install matplotlib
+pip3 install plotly==5.23.0
+pip3 install requests-futures
+pip3 install scipy
 ```
 
 # How to use
