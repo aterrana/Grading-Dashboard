@@ -235,7 +235,8 @@ class GradingDashboard:
         self.figures.append("This table summarizes the grading progress for each section.<br>")
         self.figures.append(f'The "scores per student" column will be colored more and more green as the value approaches the target number of scores per student, which for this assignment has been set to {self.target_scorecount}.<br>')
         self.figures.append("<br>Try out sorting each column using the dropdown menu to the right.<br>")
-        self.figures.append("<i>The key associating each section ('Section C') with it's Forum section ID ('16193482') is found at the bottom of the report</i>")
+        if self.anonymize:
+            self.figures.append("<i>The key associating each section ('Section B') with its Forum title ('Lastname MW@12:00pm, City') is found at the bottom of the report</i>")
 
         self.figures.append(fig)
 
@@ -289,7 +290,7 @@ class GradingDashboard:
         column_colors.extend([np.array(greys_colorscale)[lo_color_indices[i]] for i in range(len(self.sorted_LOs))])
         
         self.figures.append('<center><h2>LO grading progress</h2></center>')
-        self.figures.append('This table show how many scores each section has given, in total and for each LO')
+        self.figures.append('This table shows how many scores each section has, in total and for each LO')
         
         # Split up the data, colors, and names into multiple lists, that go into multiple tables
         data_copy = data[:]
@@ -544,7 +545,7 @@ class GradingDashboard:
                                                     ['Section name', 
                                                      'Mean score',
                                                      'Standard Deviation',
-                                                     'Count of significant tests',
+                                                     'Count of significant test results',
                                                      'Avg effect size among significant']),
                                         cells=dict(values=data,
                                                     fill_color=[
@@ -598,10 +599,18 @@ class GradingDashboard:
 
         self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
         self.figures.append('This table summarizes the information from pairwise t-tests between each section. The detailed information of each t-test can be found below this table.<br>')
-        self.figures.append('The "Count of significant tests" describes how many other sections this specific section is different from, with statistical significance.<br>')
-        self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
-        self.figures.append('The final column "Avg effect size among significant" displays the average cohen\'s d among all significant tests, so the average number of standard deviations the means are in all significant tests.<br>')
-        
+        self.figures.append('The "Count of significant test results" describes how many other sections this specific section is different from, with statistical significance (p<0.05).<br>')
+        #self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
+        self.figures.append("The final column \"Avg effect size among significant\" displays the average Cohen's d among all tests with a statistically significant result. Cohen’s d is a standardized measure of practical significance, calculated as the difference in means in units of standard deviations:.<br>")
+        self.figures.append('''
+        $(".latex").latex();
+
+
+        <div class="latex">  
+            \int_{0}^{\pi}\frac{x^{4}\left(1-x\right)^{4}}{1+x^{2}}dx =\frac{22}{7}-\pi  
+        </div>
+        ''')
+
         self.figures.append(fig)
 
     def t_test_grids(self) -> None:
@@ -1054,7 +1063,7 @@ class GradingDashboard:
             # Display the results
             # Small p-value means statistically significant
             output += "<center><h2> ANOVA Results (global significance test)</h2></center>"
-            output += "ANOVA is a difference of means test for multiple groups. It gives a global p-value, which if significant, means that it's likely that a students average score is effected by the students section, in general.<br>"
+            output += "ANOVA is a difference of means test for multiple groups. It gives a global p-value, which if significant, means that it's likely that there is a general association between student average score and section.<br>"
             output += "Note that ANOVA assumes normality, and equal variance in each group. Especially the second criteria could be false for student scores, and if so, ANOVA results should not be trusted blindly."
             rounded_pval_string = str(round(p_value, 4))
             pval_percentage_string = str(round(p_value*100, 2))
@@ -1453,12 +1462,11 @@ class GradingDashboard:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
         self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
-        self.figures.append("<center><h1>Progress</h1></center>")
-        self.figures.append("This section will describe how far gone each section is in their grading respectively<br>")
+        self.figures.append("<center><h1>Grading Progress</h1></center>")
         self.progress_table()
         self.LO_progress_table()
-        self.figures.append("<center><h1>Significance tests</h1></center>")
-        self.figures.append("This section will describe the comparisons between sections and their practical and statistical significance.<br>")
+        self.figures.append("<center><h1>Section Comparisons</h1></center>")
+        self.figures.append("This section describes the comparisons between sections and their practical and statistical significance.<br>")
         self.figures.append("For all tests, independence and normality is assumed.<br>")
         self.ANOVA_test(False)
         self.summary_stats_table()
