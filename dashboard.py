@@ -735,7 +735,7 @@ class GradingDashboard:
         fig = go.Figure(data=[fig, highlight_scatter])
         
         fig.update_layout(plot_bgcolor='white',
-                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are.<br>Positive values mean that y-axis section has larger mean than x-axis section.")
+                          title="<b>Effect sizes (cohen's d) from T tests</b><br>The number of standard deviations away the means are.<br>Positive values mean that x-axis section has larger mean than y-axis section.")
         fig.update_xaxes(showline=False)
         fig.update_yaxes(showline=False)
 
