@@ -155,9 +155,13 @@ class GradingDashboard:
             scores_colorscale = ['lightblue']
             score_color_indices = [0] * len(scores_counts)
         else:
-            num_colors = 5
-            scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
-            score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+            #num_colors = 5
+            #scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
+            #score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+
+            scores_colorscale = ['rgb(255, 71, 76)', 'rgb(144, 238, 144)']
+            score_color_indices = [0 if score_count < self.target_scorecount else 1 for score_count in scores_counts]
+
 
 
         redblue_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
