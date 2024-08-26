@@ -1395,7 +1395,7 @@ class GradingDashboard:
         
         fig.update_layout(height=250+35*len(self.section_ids), font_size=15)
 
-        self.figures.append('<center><h1>Section name to ID key</h1></center>')
+        self.figures.append('<center><h1>Section report name to section title key</h1></center>')
         
         self.figures.append(fig)
 
