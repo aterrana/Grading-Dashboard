@@ -1462,8 +1462,6 @@ class GradingDashboard:
         self.figures.append("For all tests, independence and normality is assumed.<br>")
         self.ANOVA_test(False)
         self.summary_stats_table()
-        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
-        self.t_test_grids()
         self.figures.append("<center><h1>Score distributions</h1></center>")
         self.scoreavgs_allsections_plot()
         self.figures.append("In the figure below, each section has two plots.")
@@ -1471,6 +1469,8 @@ class GradingDashboard:
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
         self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
         self.boxplots()
+        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
+        self.t_test_grids()
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
         self.LO_stackedbar_plot_all()
