@@ -602,14 +602,6 @@ class GradingDashboard:
         self.figures.append('The "Count of significant test results" describes how many other sections this specific section is different from, with statistical significance (p<0.05).<br>')
         #self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
         self.figures.append("The final column \"Avg effect size among significant\" displays the average Cohen's d among all tests with a statistically significant result. Cohen’s d is a standardized measure of practical significance, calculated as the difference in means in units of standard deviations:.<br>")
-        self.figures.append('''
-        $(".latex").latex();
-
-
-        <div class="latex">  
-            \int_{0}^{\pi}\frac{x^{4}\left(1-x\right)^{4}}{1+x^{2}}dx =\frac{22}{7}-\pi  
-        </div>
-        ''')
 
         self.figures.append(fig)
 
