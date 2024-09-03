@@ -63,7 +63,10 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
+            if len(self.section_ids) < 6:
+                self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
+            else:
+                self.section_names = [self.dict_all['sections'][section_id]['title'] for section_id in self.section_ids]
             self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
@@ -305,7 +308,7 @@ class GradingDashboard:
         max_width = 8
         num_tables = math.ceil(len(data_copy) / max_width)
         table_width = math.ceil((len(data_copy) + num_tables-1) / num_tables)
-        
+
         if len(data_copy) >= table_width:
             
             split_data = []
@@ -324,9 +327,10 @@ class GradingDashboard:
                 column_names_copy = column_names_copy[table_width:]
                 column_names_copy.insert(0, column_names[0])
             
-            split_data.append(data_copy[:])
-            split_column_colors.append(column_colors_copy[:])
-            split_column_names.append(column_names_copy[:])
+            if len(data_copy) > 1:
+                split_data.append(data_copy[:])
+                split_column_colors.append(column_colors_copy[:])
+                split_column_names.append(column_names_copy[:])
 
 
         else:
@@ -347,14 +351,10 @@ class GradingDashboard:
             # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
             section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
 
-            #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
             total_color_dict = {section_id:split_column_colors[j][1][i] for i, section_id in enumerate(self.section_names)}
 
             lo_color_dicts = [{section_id:split_column_colors[j][lo_name_i+1][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(data)-1)]
 
-            #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
-            #                  {"name": "Sort by total scores", "col_i": 1}]
-            #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
             ## Create sorting drop-down menu
             fig.update_layout(
                 updatemenus=[dict(
@@ -378,7 +378,7 @@ class GradingDashboard:
                         y = 1.26,
                         x = 1
                     )],
-                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 2.8),
+                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 3.1),
                     font_size=15,
                     margin = dict(t=0, b=0))
             
@@ -671,6 +671,7 @@ class GradingDashboard:
         cohens_d_text = [list(row) for row in reversed(cohens_d_text)]
         t_test_pvals_colori = np.transpose(np.array(t_test_pvals_colori))
         t_test_pvals_colori = [list(row) for row in reversed(t_test_pvals_colori)]
+
         fig = go.Figure(data=go.Heatmap(z=t_test_pvals_colori,
                                         zmax=1,
                                         zmin=0,
