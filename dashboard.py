@@ -302,7 +302,7 @@ class GradingDashboard:
         column_names_copy = column_names[:]
 
         # Figure out how many tables will be needed, and what their width should be
-        max_width = 5
+        max_width = 8
         num_tables = math.ceil(len(data_copy) / max_width)
         table_width = math.ceil((len(data_copy) + num_tables-1) / num_tables)
         
