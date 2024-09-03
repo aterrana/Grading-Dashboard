@@ -1460,30 +1460,43 @@ class GradingDashboard:
 
         self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
         self.figures.append("<center><h1>Grading Progress</h1></center>")
-        self.progress_table()
-        self.LO_progress_table()
+        try: self.progress_table()
+        except Exception as error_message: print(f"Failed to create progress table\n {error_message=}")
+        try: self.LO_progress_table()
+        except Exception as error_message: print(f"Failed to create LO progress table\n {error_message=}")
+
         self.figures.append("<center><h1>Section Comparisons</h1></center>")
         self.figures.append("This section describes the comparisons between sections and their practical and statistical significance.<br>")
         self.figures.append("For all tests, independence and normality is assumed.<br>")
-        self.ANOVA_test(False)
-        self.summary_stats_table()
+        try: self.ANOVA_test(False)
+        except Exception as error_message: print(f"Failed to create ANOVA test\n {error_message=}")
+
+        try: self.summary_stats_table()
+        except Exception as error_message: print(f"Failed to create summary stats table\n {error_message=}")
+
         self.figures.append("<center><h1>Score distributions</h1></center>")
-        self.scoreavgs_allsections_plot()
+        try: self.scoreavgs_allsections_plot()
+        except Exception as error_message: print(f"Failed to create score histogram\n {error_message=}")
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
         self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
-        self.boxplots()
+        try: self.boxplots()
+        except Exception as error_message: print(f"Failed to create score boxplots\n {error_message=}")
         self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
-        self.t_test_grids()
+        try: self.t_test_grids()
+        except Exception as error_message: print(f"Failed to create t-test result grid\n {error_message=}")
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
-        self.LO_stackedbar_plot_all()
+        try: self.LO_stackedbar_plot_all()
+        except Exception as error_message: print(f"Failed to create stacked barplot for all LOs\n {error_message=}")
         for lo_name in self.sorted_LOs:
-            self.LO_stackedbar_plot(lo_name)
+            try: self.LO_stackedbar_plot(lo_name)
+            except Exception as error_message: print(f"Failed to create stacked barplot for {lo_name}\n {error_message=}")
 
         if self.anonymize:
-            self.section_id_table()
+            try: self.section_id_table()
+            except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
