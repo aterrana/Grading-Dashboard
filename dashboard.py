@@ -63,7 +63,10 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
+            if len(self.section_ids) < 6:
+                self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
+            else:
+                self.section_names = [self.dict_all['sections'][section_id]['title'] for section_id in self.section_ids]
             self.grades_dict = grades_dict
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
@@ -155,9 +158,13 @@ class GradingDashboard:
             scores_colorscale = ['lightblue']
             score_color_indices = [0] * len(scores_counts)
         else:
-            num_colors = 5
-            scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
-            score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+            #num_colors = 5
+            #scores_colorscale = sample_colorscale('RdYlGn', list(np.linspace(0.15, 0.85, num_colors)))
+            #score_color_indices = [min(num_colors-1, int((num_colors-1)*score_count/self.target_scorecount)) for score_count in scores_counts]
+
+            scores_colorscale = ['rgb(255, 71, 76)', 'rgb(144, 238, 144)']
+            score_color_indices = [0 if score_count < self.target_scorecount else 1 for score_count in scores_counts]
+
 
 
         redblue_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
@@ -298,10 +305,10 @@ class GradingDashboard:
         column_names_copy = column_names[:]
 
         # Figure out how many tables will be needed, and what their width should be
-        max_width = 5
+        max_width = 8
         num_tables = math.ceil(len(data_copy) / max_width)
         table_width = math.ceil((len(data_copy) + num_tables-1) / num_tables)
-        
+
         if len(data_copy) >= table_width:
             
             split_data = []
@@ -320,9 +327,10 @@ class GradingDashboard:
                 column_names_copy = column_names_copy[table_width:]
                 column_names_copy.insert(0, column_names[0])
             
-            split_data.append(data_copy[:])
-            split_column_colors.append(column_colors_copy[:])
-            split_column_names.append(column_names_copy[:])
+            if len(data_copy) > 1:
+                split_data.append(data_copy[:])
+                split_column_colors.append(column_colors_copy[:])
+                split_column_names.append(column_names_copy[:])
 
 
         else:
@@ -343,14 +351,10 @@ class GradingDashboard:
             # Create dictionaries for all colors, with section_id as key, to be able to maintain colors after sorting
             section_color_dict = {section_id:self.table_section_colors[i] for i, section_id in enumerate(self.section_names)}
 
-            #score_count_color_dicts = [{section_id:column_colors[lo_index+2][i] for i, section_id in enumerate(self.section_names)} for lo_index in range(len(self.all_LOs))]
             total_color_dict = {section_id:split_column_colors[j][1][i] for i, section_id in enumerate(self.section_names)}
 
             lo_color_dicts = [{section_id:split_column_colors[j][lo_name_i+1][i] for i, section_id in enumerate(self.section_names)} for lo_name_i in range(len(data)-1)]
 
-            #menu_selection = [{"name": "Sort by section name", "col_i": 0}, 
-            #                  {"name": "Sort by total scores", "col_i": 1}]
-            #menu_selection.extend([{"name": f"Sort by {lo_name}", "col_i": 2+i} for i, lo_name in enumerate(self.all_LOs)])
             ## Create sorting drop-down menu
             fig.update_layout(
                 updatemenus=[dict(
@@ -374,7 +378,7 @@ class GradingDashboard:
                         y = 1.26,
                         x = 1
                     )],
-                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 2.8),
+                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 3.1),
                     font_size=15,
                     margin = dict(t=0, b=0))
             
@@ -667,6 +671,7 @@ class GradingDashboard:
         cohens_d_text = [list(row) for row in reversed(cohens_d_text)]
         t_test_pvals_colori = np.transpose(np.array(t_test_pvals_colori))
         t_test_pvals_colori = [list(row) for row in reversed(t_test_pvals_colori)]
+
         fig = go.Figure(data=go.Heatmap(z=t_test_pvals_colori,
                                         zmax=1,
                                         zmin=0,
@@ -1455,30 +1460,43 @@ class GradingDashboard:
 
         self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
         self.figures.append("<center><h1>Grading Progress</h1></center>")
-        self.progress_table()
-        self.LO_progress_table()
+        try: self.progress_table()
+        except Exception as error_message: print(f"Failed to create progress table\n {error_message=}")
+        try: self.LO_progress_table()
+        except Exception as error_message: print(f"Failed to create LO progress table\n {error_message=}")
+
         self.figures.append("<center><h1>Section Comparisons</h1></center>")
         self.figures.append("This section describes the comparisons between sections and their practical and statistical significance.<br>")
         self.figures.append("For all tests, independence and normality is assumed.<br>")
-        self.ANOVA_test(False)
-        self.summary_stats_table()
+        try: self.ANOVA_test(False)
+        except Exception as error_message: print(f"Failed to create ANOVA test\n {error_message=}")
+
+        try: self.summary_stats_table()
+        except Exception as error_message: print(f"Failed to create summary stats table\n {error_message=}")
+
         self.figures.append("<center><h1>Score distributions</h1></center>")
-        self.scoreavgs_allsections_plot()
+        try: self.scoreavgs_allsections_plot()
+        except Exception as error_message: print(f"Failed to create score histogram\n {error_message=}")
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
         self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
-        self.boxplots()
+        try: self.boxplots()
+        except Exception as error_message: print(f"Failed to create score boxplots\n {error_message=}")
         self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
-        self.t_test_grids()
+        try: self.t_test_grids()
+        except Exception as error_message: print(f"Failed to create t-test result grid\n {error_message=}")
         self.figures.append("<center><h1>LO score distributions</h1></center>")
 
-        self.LO_stackedbar_plot_all()
+        try: self.LO_stackedbar_plot_all()
+        except Exception as error_message: print(f"Failed to create stacked barplot for all LOs\n {error_message=}")
         for lo_name in self.sorted_LOs:
-            self.LO_stackedbar_plot(lo_name)
+            try: self.LO_stackedbar_plot(lo_name)
+            except Exception as error_message: print(f"Failed to create stacked barplot for {lo_name}\n {error_message=}")
 
         if self.anonymize:
-            self.section_id_table()
+            try: self.section_id_table()
+            except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
