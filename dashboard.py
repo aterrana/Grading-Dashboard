@@ -348,7 +348,9 @@ class GradingDashboard:
         if self.anonymize:
             self.figures.append("<i>The key associating each section ('Section B') with its Forum title ('Lastname MW@12:00pm, City') is found at the bottom of the report</i>")
 
+        #self.figures.append('''<center><details><summary>Progress table</summary><p>''')
         self.figures.append(fig)
+        #self.figures.append('''  </p> </details></center>''')
 
     def LO_progress_table(self) -> None:
         ''' Produces table with LO score-count progress, adds it to report '''
@@ -481,13 +483,12 @@ class GradingDashboard:
                         y = 1.26,
                         x = 1
                     )],
-                    height=110+28*len(self.section_ids) * (1 if self.anonymize else 3.1),
+                    height=125+29*len(self.section_ids) * (1 if self.anonymize else 2.8),
                     font_size=15,
                     margin = dict(t=0, b=0))
             
-            
             self.figures.append(fig)
-
+            
     def summary_stats_table(self) -> None:
         ''' Produces table with summary statistics, adds it to report '''
         # Calculate section means and SDs
@@ -686,7 +687,6 @@ class GradingDashboard:
                 height=290+30*len(self.section_ids) * (1 if self.anonymize else 3),
                 font_size=15)
 
-        self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
         self.figures.append('This table summarizes the information from pairwise t-tests between each section. The detailed information of each t-test can be found below this table.<br>')
         self.figures.append('The "Count of significant test results" describes how many other sections this specific section is different from, with statistical significance (p<0.05).<br>')
         #self.figures.append('If there is a "problem section", this would show up as one section having a clearly larger number in this column.<br>')
@@ -1503,6 +1503,37 @@ class GradingDashboard:
                 body {
                     font-family: 'Open Sans', sans-serif;
                 }
+
+                details {
+                    user-select: none;
+                }
+
+                details>summary span.icon {
+                    width: 24px;
+                    height: 24px;
+                    transition: all 0.3s;
+                }
+
+                details[open] summary span.icon {
+                    transform: rotate(-90deg);
+                }
+
+                summary {
+                    display: flex;
+                    cursor: pointer;
+                }
+
+                summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                .vertical {
+                    border-left: 2px solid black;
+                }
+
+                .spaced {
+                margin-left: 40px;
+                }
             </style>
         </head>
         <body>
@@ -1513,7 +1544,7 @@ class GradingDashboard:
         self.figures.insert(0, html_head)
         self.figures.append(html_end)
 
-        with open('grading_dashboard.html', 'a') as f:
+        with open('grading_dashboard.html', 'a', encoding="utf-8") as f:
             # Remove contents
             f.truncate(0)
             for fig in self.figures:
@@ -1545,44 +1576,95 @@ class GradingDashboard:
 
         self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
         self.figures.append("<center><h1>Grading Progress</h1></center>")
+        self.figures.append('''<details><summary>Summary progress table  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.progress_table()
-        except Exception as error_message: print(f"Failed to create progress table\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create progress table\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
+
+        self.figures.append('''<br><details><summary>LO progress tables  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.LO_progress_table()
-        except Exception as error_message: print(f"Failed to create LO progress table\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create LO progress table\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
 
         self.figures.append("<center><h1>Section Comparisons</h1></center>")
         self.figures.append("This section describes the comparisons between sections and their practical and statistical significance.<br>")
         self.figures.append("For all tests, independence and normality is assumed.<br>")
+        self.figures.append('''<details><summary>ANOVA test results  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.ANOVA_test(False)
-        except Exception as error_message: print(f"Failed to create ANOVA test\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create ANOVA test\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
 
+        self.figures.append('<center><h2>Summary statistics (Pairwise significance tests)</h2></center>')
+        self.figures.append('''<details><summary>Summary stats table  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.summary_stats_table()
-        except Exception as error_message: print(f"Failed to create summary stats table\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create summary stats table\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
+
 
         self.figures.append("<center><h1>Score distributions</h1></center>")
+        self.figures.append('''<details><summary>Scores histogram  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.scoreavgs_allsections_plot()
-        except Exception as error_message: print(f"Failed to create score histogram\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create score histogram\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
+
+        self.figures.append('''<br><details><summary>Scores boxplots  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
         self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
         try: self.boxplots()
-        except Exception as error_message: print(f"Failed to create score boxplots\n {error_message=}")
-        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
-        try: self.t_test_grids()
-        except Exception as error_message: print(f"Failed to create t-test result grid\n {error_message=}")
-        self.figures.append("<center><h1>LO score distributions</h1></center>")
+        except Exception as error_message: 
+            print(f"Failed to create score boxplots\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
 
+        self.figures.append("<center><h2>Pairwise significance test results (T tests)</h2></center>")
+        self.figures.append('''<details><summary>T-test results  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
+        try: self.t_test_grids()
+        except Exception as error_message: 
+            print(f"Failed to create t-test result grid\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
+        
+        self.figures.append("<center><h1>LO score distributions</h1></center>")
+        self.figures.append('''<details><summary>Stacked barplot, per LOs  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.LO_stackedbar_plot_all()
-        except Exception as error_message: print(f"Failed to create stacked barplot for all LOs\n {error_message=}")
+        except Exception as error_message: 
+            print(f"Failed to create stacked barplot for all LOs\n {error_message=}")
+            self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
+
+        self.figures.append('''<br><details><summary>Stacked barplot, per section  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('<div class= "vertical"><div class= "spaced">')
         for lo_name in self.sorted_LOs:
             try: self.LO_stackedbar_plot(lo_name)
-            except Exception as error_message: print(f"Failed to create stacked barplot for {lo_name}\n {error_message=}")
+            except Exception as error_message: 
+                print(f"Failed to create stacked barplot for {lo_name}\n {error_message=}")
+                self.figures.append(f"This plot failed because: {error_message=}")
+        self.figures.append('''  </div></div></p> </details>''')
 
         if self.anonymize:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
-        self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
+        self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
 def create_report(anonymize, target_scorecount):
