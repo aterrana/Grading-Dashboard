@@ -1500,55 +1500,6 @@ class GradingDashboard:
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
 
-# Create new file with only portions of fake_data
-def create_data(file_name:str, total_scores:int):
-
-    # Read in data
-
-    # Open the file
-    with open(file_name, 'r', encoding='utf8') as file:
-        data = file.read()
-
-    # Dangerous eval call, should test for errors
-    try:
-        dict_all = eval(data)
-    except:
-        raise Exception("text in file not properly formatted dictionary")
-
-    # Edit data in dict variable
-    all_scores_path = []
-
-    # Get all score paths
-    for section_ID in dict_all.keys():
-        for student_ID in dict_all[section_ID].keys():
-            for score_index in range(len(dict_all[section_ID][student_ID])):
-                all_scores_path.append((section_ID, student_ID, score_index))
-        
-    rnd.seed(13) # 10
-    chosen_scores = rnd.sample(all_scores_path, total_scores)
-    #print(chosen_scores)
-    new_dict = {}
-
-    for score_path in chosen_scores:
-        if score_path[0] in new_dict.keys():
-            if score_path[1] in new_dict[score_path[0]].keys():
-                # Add the score data to the list, if the list already exists
-                new_dict[score_path[0]][score_path[1]].append(dict_all[score_path[0]][score_path[1]][score_path[2]])
-            else:
-                # This student doesn't exist yet, add it with a list containing the score data
-                new_dict[score_path[0]][score_path[1]] = [dict_all[score_path[0]][score_path[1]][score_path[2]]]
-        else:
-            # This section doesn't exist yet, add it with the correct student and data list
-            new_dict[score_path[0]] = {score_path[1]: [dict_all[score_path[0]][score_path[1]][score_path[2]]]}
-
-    # Write dictionary into new file
-    new_file_name = 'fake_data_new.py'
-
-    with open(new_file_name, 'w', encoding='utf8') as file:
-        file.write(str(new_dict))
-        
-    return new_file_name
-
 def create_report(anonymize, target_scorecount):
     print("Creating report")
     gd = GradingDashboard('grade_data.py', anonymize=anonymize, target_scorecount=target_scorecount)
