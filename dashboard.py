@@ -3,7 +3,6 @@
 from plotly.express.colors import sample_colorscale
 from plotly.express.colors import qualitative as disc_colors
 import plotly.graph_objects as go
-from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats as sts
 import random as rnd
 import numpy as np
@@ -25,6 +24,110 @@ class GradingDashboard:
     2. Run all methods corresponding to the graphs and components you want in the report (in the order you want them to appear)
     3. Run create_html to create the .html file of the report
     '''
+
+    # Stored this list to avoid dependency on matplotlib
+    forum_scoreclrs_rgbscheme = [
+        [1.        , 0.        , 0.        , 1.        ],
+        [1.        , 0.02029988, 0.        , 1.        ],
+        [1.        , 0.05074971, 0.        , 1.        ],
+        [1.        , 0.0710496 , 0.        , 1.        ],
+        [1.        , 0.10149942, 0.        , 1.        ],
+        [1.        , 0.12179931, 0.        , 1.        ],
+        [1.        , 0.15224913, 0.        , 1.        ],
+        [1.        , 0.18269896, 0.        , 1.        ],
+        [1.        , 0.20299885, 0.        , 1.        ],
+        [1.        , 0.23344867, 0.        , 1.        ],
+        [1.        , 0.25374856, 0.        , 1.        ],
+        [1.        , 0.28419839, 0.        , 1.        ],
+        [1.        , 0.31464821, 0.        , 1.        ],
+        [1.        , 0.3349481 , 0.        , 1.        ],
+        [1.        , 0.36539792, 0.        , 1.        ],
+        [1.        , 0.38569781, 0.        , 1.        ],
+        [1.        , 0.41614764, 0.        , 1.        ],
+        [1.        , 0.43644752, 0.        , 1.        ],
+        [1.        , 0.46689735, 0.        , 1.        ],
+        [1.        , 0.49734717, 0.        , 1.        ],
+        [1.        , 0.51764706, 0.        , 1.        ],
+        [1.        , 0.54809689, 0.        , 1.        ],
+        [1.        , 0.56839677, 0.        , 1.        ],
+        [1.        , 0.5988466 , 0.        , 1.        ],
+        [1.        , 0.62929642, 0.        , 1.        ],
+        [0.99607843, 0.64648981, 0.        , 1.        ],
+        [0.94901961, 0.63966167, 0.        , 1.        ],
+        [0.91764706, 0.63510957, 0.        , 1.        ],
+        [0.87058824, 0.62828143, 0.        , 1.        ],
+        [0.83921569, 0.62372933, 0.        , 1.        ],
+        [0.79215686, 0.61690119, 0.        , 1.        ],
+        [0.74509804, 0.61007305, 0.        , 1.        ],
+        [0.71372549, 0.60552095, 0.        , 1.        ],
+        [0.66666667, 0.59869281, 0.        , 1.        ],
+        [0.63529412, 0.59414072, 0.        , 1.        ],
+        [0.58823529, 0.58731257, 0.        , 1.        ],
+        [0.54117647, 0.58048443, 0.        , 1.        ],
+        [0.50980392, 0.57593233, 0.        , 1.        ],
+        [0.4627451 , 0.56910419, 0.        , 1.        ],
+        [0.43137255, 0.5645521 , 0.        , 1.        ],
+        [0.38431373, 0.55772395, 0.        , 1.        ],
+        [0.3372549 , 0.55089581, 0.        , 1.        ],
+        [0.30588235, 0.54634371, 0.        , 1.        ],
+        [0.25882353, 0.53951557, 0.        , 1.        ],
+        [0.22745098, 0.53496348, 0.        , 1.        ],
+        [0.18039216, 0.52813533, 0.        , 1.        ],
+        [0.14901961, 0.52358324, 0.        , 1.        ],
+        [0.10196078, 0.51675509, 0.        , 1.        ],
+        [0.05490196, 0.50992695, 0.        , 1.        ],
+        [0.02352941, 0.50537486, 0.        , 1.        ],
+        [0.        , 0.49014994, 0.02352941, 1.        ],
+        [0.        , 0.47440215, 0.05490196, 1.        ],
+        [0.        , 0.45078047, 0.10196078, 1.        ],
+        [0.        , 0.42715879, 0.14901961, 1.        ],
+        [0.        , 0.411411  , 0.18039216, 1.        ],
+        [0.        , 0.38778931, 0.22745098, 1.        ],
+        [0.        , 0.37204152, 0.25882353, 1.        ],
+        [0.        , 0.34841984, 0.30588235, 1.        ],
+        [0.        , 0.33267205, 0.3372549 , 1.        ],
+        [0.        , 0.30905037, 0.38431373, 1.        ],
+        [0.        , 0.28542868, 0.43137255, 1.        ],
+        [0.        , 0.26968089, 0.4627451 , 1.        ],
+        [0.        , 0.24605921, 0.50980392, 1.        ],
+        [0.        , 0.23031142, 0.54117647, 1.        ],
+        [0.        , 0.20668973, 0.58823529, 1.        ],
+        [0.        , 0.18306805, 0.63529412, 1.        ],
+        [0.        , 0.16732026, 0.66666667, 1.        ],
+        [0.        , 0.14369858, 0.71372549, 1.        ],
+        [0.        , 0.12795079, 0.74509804, 1.        ],
+        [0.        , 0.1043291 , 0.79215686, 1.        ],
+        [0.        , 0.08070742, 0.83921569, 1.        ],
+        [0.        , 0.06495963, 0.87058824, 1.        ],
+        [0.        , 0.04133795, 0.91764706, 1.        ],
+        [0.        , 0.02559016, 0.94901961, 1.        ],
+        [0.        , 0.00196847, 0.99607843, 1.        ],
+        [0.01377932, 0.        , 0.98632834, 1.        ],
+        [0.037401  , 0.        , 0.9628912 , 1.        ],
+        [0.06102268, 0.        , 0.93945406, 1.        ],
+        [0.07677047, 0.        , 0.9238293 , 1.        ],
+        [0.10039216, 0.        , 0.90039216, 1.        ],
+        [0.11613995, 0.        , 0.8847674 , 1.        ],
+        [0.13976163, 0.        , 0.86133026, 1.        ],
+        [0.16338331, 0.        , 0.83789312, 1.        ],
+        [0.1791311 , 0.        , 0.82226836, 1.        ],
+        [0.20275279, 0.        , 0.79883122, 1.        ],
+        [0.21850058, 0.        , 0.78320646, 1.        ],
+        [0.24212226, 0.        , 0.75976932, 1.        ],
+        [0.25787005, 0.        , 0.74414456, 1.        ],
+        [0.28149173, 0.        , 0.72070742, 1.        ],
+        [0.30511342, 0.        , 0.69727028, 1.        ],
+        [0.32086121, 0.        , 0.68164552, 1.        ],
+        [0.34448289, 0.        , 0.65820838, 1.        ],
+        [0.36023068, 0.        , 0.64258362, 1.        ],
+        [0.38385236, 0.        , 0.61914648, 1.        ],
+        [0.40747405, 0.        , 0.59570934, 1.        ],
+        [0.42322184, 0.        , 0.58008458, 1.        ],
+        [0.44684352, 0.        , 0.55664744, 1.        ],
+        [0.46259131, 0.        , 0.54102268, 1.        ],
+        [0.486213  , 0.        , 0.51758554, 1.        ],
+        [0.50196078, 0.        , 0.50196078, 1.        ]]
+
     def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None, student_count: list = []) -> None:
         '''
         Sets up global lists and dictionaries
@@ -437,28 +540,10 @@ class GradingDashboard:
         # Assign colors to cells
 
         # Create colorscales
-        redblue_colorscale = sample_colorscale('RdYlBu', list(np.linspace(0, 1, 101)))
+        redblue_colorscale = self.forum_scoreclrs_rgbscheme # Grab this from const variable in class
 
-        colors = [
-            (0, 'red'),     # At 1, color is red
-            (25, 'orange'), # At 25, color is orange
-            (50, 'green'),  # At 50, color is green
-            (75, 'blue'),   # At 75, color is blue
-            (100, 'purple') # At 100, color is purple
-        ]
-
-        # Normalize the position values to be between 0 and 1
-        colors_normalized = [(pos/100.0, color) for pos, color in colors]
-
-        # Create the custom colormap
-        cmap = LinearSegmentedColormap.from_list('custom_colormap', colors_normalized)  # Find another way to do this and remove need for matplotlib
-
-        # Create an array of 100 values ranging from 0 to 1
-        values = np.linspace(0, 1, 100)
-
-        # Create an array to store the RGB values of the colorscale
-        redblue_colorscale = cmap(values)
-        redblue_colorscale = ["rgba(" + str(int(255*val[0])) + ',' + str(int(255*val[1])) + ',' + str(int(255*val[2])) + ",0.6)" for val in redblue_colorscale]
+        bright_f = 1.3 # Increased brightness of score colors by 30%
+        redblue_colorscale = ["rgba(" + str(min(255, int(255*val[0]*bright_f))) + ',' + str(min(255, int(255*val[1]*bright_f))) + ',' + str(min(255, int(255*val[2]*bright_f))) + ",0.6)" for val in redblue_colorscale]
 
         greys_colorscale = sample_colorscale('Greys', list(np.linspace(0, 1, 101)))
         reds_colorscale = sample_colorscale('Reds', list(np.linspace(0, 1, 101)))
@@ -1499,55 +1584,6 @@ class GradingDashboard:
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
         self.create_html()
-
-# Create new file with only portions of fake_data
-def create_data(file_name:str, total_scores:int):
-
-    # Read in data
-
-    # Open the file
-    with open(file_name, 'r', encoding='utf8') as file:
-        data = file.read()
-
-    # Dangerous eval call, should test for errors
-    try:
-        dict_all = eval(data)
-    except:
-        raise Exception("text in file not properly formatted dictionary")
-
-    # Edit data in dict variable
-    all_scores_path = []
-
-    # Get all score paths
-    for section_ID in dict_all.keys():
-        for student_ID in dict_all[section_ID].keys():
-            for score_index in range(len(dict_all[section_ID][student_ID])):
-                all_scores_path.append((section_ID, student_ID, score_index))
-        
-    rnd.seed(13) # 10
-    chosen_scores = rnd.sample(all_scores_path, total_scores)
-    #print(chosen_scores)
-    new_dict = {}
-
-    for score_path in chosen_scores:
-        if score_path[0] in new_dict.keys():
-            if score_path[1] in new_dict[score_path[0]].keys():
-                # Add the score data to the list, if the list already exists
-                new_dict[score_path[0]][score_path[1]].append(dict_all[score_path[0]][score_path[1]][score_path[2]])
-            else:
-                # This student doesn't exist yet, add it with a list containing the score data
-                new_dict[score_path[0]][score_path[1]] = [dict_all[score_path[0]][score_path[1]][score_path[2]]]
-        else:
-            # This section doesn't exist yet, add it with the correct student and data list
-            new_dict[score_path[0]] = {score_path[1]: [dict_all[score_path[0]][score_path[1]][score_path[2]]]}
-
-    # Write dictionary into new file
-    new_file_name = 'fake_data_new.py'
-
-    with open(new_file_name, 'w', encoding='utf8') as file:
-        file.write(str(new_dict))
-        
-    return new_file_name
 
 def create_report(anonymize, target_scorecount):
     print("Creating report")
