@@ -1627,7 +1627,7 @@ class GradingDashboard:
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
-        self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
+        self.figures.append("<b> Click or double click the legend on the right to select and deselect different sections</b>")
         try: self.boxplots()
         except Exception as error_message: 
             print(f"Failed to create score boxplots\n {error_message=}")
