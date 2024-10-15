@@ -158,17 +158,24 @@ all_assignments = dict(zip(
 
 grades = defaultdict(lambda: defaultdict(list))
 grades = {}
+is_group_assignment = False
 for section_id in sections.keys():
     assignment = all_assignments[section_id]
     # Get scores and comments, grouped by student
     for assessment in assignment['outcome-assessments']:
         if assessment['active']:  # As far as I know, deleted scores/comments are marked as inactive
             student_id = assessment['target-user-id']
+            if student_id is None:
+                student_id = assessment['target-assignment-group-id']
+                if student_id is not None:
+                    is_group_assignment = True
             
             if section_id not in grades.keys():
                 grades[section_id] = {}
-            if student_id not in grades[section_id].keys():
-                grades[section_id][student_id] = []
+            if student_id is not None:
+                if student_id not in grades[section_id].keys():
+                    grades[section_id][student_id] = []
+
 
             grades[section_id][student_id].append({
                 'learning_outcome': los.get(assessment['learning-outcome'], assessment['learning-outcome']),
@@ -215,7 +222,7 @@ while True:
 
 print()
 
-dashboard.create_report(anon_answer, target_score)
+dashboard.create_report(anon_answer, target_score, is_group_assignment)
 
 '''
 # Step 7 (optional): Anonymize the data
