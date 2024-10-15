@@ -1627,7 +1627,7 @@ class GradingDashboard:
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
-        self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
+        self.figures.append("<b> Click or double click the legend on the right to select and deselect different sections</b>")
         try: self.boxplots()
         except Exception as error_message: 
             print(f"Failed to create score boxplots\n {error_message=}")
@@ -1665,6 +1665,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
+        self.figures.append("V2.0")
         self.create_html()
 
 def create_report(anonymize, target_scorecount):
