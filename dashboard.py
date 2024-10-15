@@ -128,11 +128,12 @@ class GradingDashboard:
         [0.486213  , 0.        , 0.51758554, 1.        ],
         [0.50196078, 0.        , 0.50196078, 1.        ]]
 
-    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None, student_count: list = []) -> None:
+    def __init__(self, file_name: str, anonymize: bool = False, target_scorecount: int = None, is_group_assignment: bool = False) -> None:
         '''
         Sets up global lists and dictionaries
         '''
         self.anonymize = anonymize
+        self.is_group_assignment = is_group_assignment
 
         # Read in data
 
@@ -156,7 +157,10 @@ class GradingDashboard:
         # Keep track of section ids, average scores, LO names, globally
         self.section_ids = list(grades_dict.keys())
         
-        self.student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
+        # current_student_count is the count of students which have been scored
+        self.current_student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
+        # total_student_count is the forum count of students, regardless of who has been scored yet
+        self.total_student_count = [self.dict_all['sections'][section_id]['student_count'] for section_id in self.dict_all['sections'].keys()]
         
         if anonymize:
             # Shuffle key_order to anonymize report
@@ -249,10 +253,10 @@ class GradingDashboard:
                     if len(submission_data['comment']) > 1:
                         comment_counter += 1
                         comment_wordcounter += len(submission_data['comment'].split(' '))
-            if len(self.student_count) == 0:
+            if len(self.current_student_count) == 0:
                 scores_counts.append(round(score_counter/student_count,2))
             else:
-                scores_counts.append(round(score_counter/self.student_count[i],2))
+                scores_counts.append(round(score_counter/self.current_student_count[i],2))
             comments_counts.append(round(comment_counter/student_count,2))
             comment_wordcounts.append(round(comment_wordcounter/student_count,2))
 
@@ -289,12 +293,15 @@ class GradingDashboard:
                 comments_counts,
                 comment_wordcounts]
         
+        grouping_text = 'student'
+        if self.is_group_assignment:
+            grouping_text = 'group'
         # Create table figure, with appropriate colors
         fig = go.Figure(data=[go.Table(header=dict(values=
                                                     ['Section name', 
-                                                     'Scores per student',
-                                                     'Comments per student',
-                                                     'Comment wordcount per student']),
+                                                     f'Scores per {grouping_text}',
+                                                     f'Comments per {grouping_text}',
+                                                     f'Comment wordcount per {grouping_text}']),
                                         cells=dict(values=data,
                                                     fill_color=[
                                                         self.table_section_colors,
@@ -1627,7 +1634,7 @@ class GradingDashboard:
         self.figures.append("In the figure below, each section has two plots.")
         self.figures.append("    The left one is a boxplot, showing the 4 quartiles of student scores. That means that the middle line is the median, having equally many student scores above and below it.")
         self.figures.append("    The right one is a whisker plot, showing the mean of the section, and one standard deviation above and below the mean.")
-        self.figures.append("<b> Click or double click the legend on the right to select and deselect different sections</b>")
+        self.figures.append("<b>Click or double click the legend on the right to select and deselect different sections</b>")
         try: self.boxplots()
         except Exception as error_message: 
             print(f"Failed to create score boxplots\n {error_message=}")
@@ -1665,12 +1672,12 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
-        self.figures.append("V2.0")
+        self.figures.append("V2.1")
         self.create_html()
 
-def create_report(anonymize, target_scorecount):
+def create_report(anonymize, target_scorecount, is_group_assignment):
     print("Creating report")
-    gd = GradingDashboard('grade_data.py', anonymize=anonymize, target_scorecount=target_scorecount)
+    gd = GradingDashboard('grade_data.py', anonymize=anonymize, target_scorecount=target_scorecount, is_group_assignment=is_group_assignment)
     gd.make_full_report()
 
     print("Opening report")
