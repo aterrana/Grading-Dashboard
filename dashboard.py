@@ -1665,6 +1665,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
+        self.figures.append("V2.0")
         self.create_html()
 
 def create_report(anonymize, target_scorecount):
