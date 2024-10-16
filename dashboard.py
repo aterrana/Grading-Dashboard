@@ -170,7 +170,7 @@ class GradingDashboard:
 
             self.section_names = [f'Section {chr(i+65)}' for i in range(len(self.section_ids))]
         else:
-            if len(self.section_ids) < 6:
+            if len(self.section_ids) < 4:
                 self.section_names = [self.dict_all['sections'][section_id]['title'].replace(' ', '<br>') for section_id in self.section_ids]
             else:
                 self.section_names = [self.dict_all['sections'][section_id]['title'] for section_id in self.section_ids]
@@ -1651,7 +1651,7 @@ class GradingDashboard:
         self.figures.append('''  </div></div></p> </details>''')
         
         self.figures.append("<center><h1>LO score distributions</h1></center>")
-        self.figures.append('''<details><summary>Stacked barplot, per LOs  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('''<details><summary>Stacked barplot, per LO  <span class="icon">👈</span></summary><p>''')
         self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.LO_stackedbar_plot_all()
         except Exception as error_message: 
@@ -1672,7 +1672,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
-        self.figures.append("V2.1")
+        self.figures.append("V2.1.1")
         self.create_html()
 
 def create_report(anonymize, target_scorecount, is_group_assignment):
