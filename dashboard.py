@@ -1113,9 +1113,9 @@ class GradingDashboard:
         
         fig.update_traces(marker_line_width=1, marker_line_color="white", text=counts)
         # Count total number of students
-        student_count_tot = len([student_id for section in self.grades_dict.keys() for student_id in self.grades_dict[section].keys() ]) 
+        student_count_tot = len([student_id for section in self.grades_dict.keys() for student_id in self.grades_dict[section].keys() ])
         fig.update_layout(
-            title=f'<b>Student score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} students)',
+            title=f'<b>{'Group' if self.is_group_assignment else 'Student'} score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} {'groups' if self.is_group_assignment else 'students'})',
             xaxis_title='Score',
             yaxis_title='Count')
         
