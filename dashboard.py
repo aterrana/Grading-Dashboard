@@ -157,11 +157,6 @@ class GradingDashboard:
         # Keep track of section ids, average scores, LO names, globally
         self.section_ids = list(grades_dict.keys())
         
-        # current_student_count is the count of students which have been scored
-        self.current_student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
-        # total_student_count is the forum count of students, regardless of who has been scored yet
-        self.total_student_count = [self.dict_all['sections'][section_id]['student_count'] for section_id in self.dict_all['sections'].keys()]
-        
         if anonymize:
             # Shuffle key_order to anonymize report
             key_order = list(grades_dict.keys())
@@ -178,6 +173,11 @@ class GradingDashboard:
 
         # Need to re-set section_ids so that they're in the same order as the potentially shuffled key order
         self.section_ids = list(self.grades_dict.keys())
+
+        # current_student_count is the count of students which have been scored
+        self.current_student_count = [len(grades_dict[section_id].keys()) for section_id in self.section_ids]
+        # total_student_count is the forum count of students, regardless of who has been scored yet
+        self.total_student_count = [self.dict_all['sections'][section_id]['student_count'] for section_id in self.dict_all['sections'].keys()]
 
         self.all_scores = []
         self.all_LOs = set()
@@ -1115,7 +1115,7 @@ class GradingDashboard:
         # Count total number of students
         student_count_tot = len([student_id for section in self.grades_dict.keys() for student_id in self.grades_dict[section].keys() ])
         fig.update_layout(
-            title=f'<b>{'Group' if self.is_group_assignment else 'Student'} score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} {'groups' if self.is_group_assignment else 'students'})',
+            title=f"<b>{'Group' if self.is_group_assignment else 'Student'} score averages</b>, all sections combined<br>({len(self.section_ids)} sections, {student_count_tot} {'groups' if self.is_group_assignment else 'students'})",
             xaxis_title='Score',
             yaxis_title='Count')
         
@@ -1582,6 +1582,7 @@ class GradingDashboard:
         ''' Creates a pre-selected set of plots and results, in the right order, then creates html '''
 
         self.figures.append(f"<center><h1>Grading Dashboard for {self.dict_all['course']['code']}, {self.dict_all['assignment_title']}</h1></center>")
+        self.figures.append(f"<center><i>Identified as a{' group' if self.is_group_assignment else 'n individual'} assignment</i></center>")
         self.figures.append("<center><h1>Grading Progress</h1></center>")
         self.figures.append('''<details><summary>Summary progress table  <span class="icon">👈</span></summary><p>''')
         self.figures.append('<div class= "vertical"><div class= "spaced">')
