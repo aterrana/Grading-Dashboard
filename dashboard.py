@@ -199,9 +199,9 @@ class GradingDashboard:
                 if len(self.all_scores[-1][-1]) == 0:
                     self.all_scores[-1] = self.all_scores[-1][:-1]
 
-            # If this section had no scores yet, occurs when only comments are exist
+            # If this section had no scores yet, occurs when only comments exist
             if len(self.all_scores[-1]) == 0:
-                print("NO SCORES")
+                print(section_id, "Had 0 scores")
                 self.all_scores[-1].append([np.nan])
                 # Keep note of the section ids that actually have scores
                 self.section_ids_w_scores.remove(section_id)
@@ -368,7 +368,7 @@ class GradingDashboard:
             for section_index, section_id in enumerate(self.section_ids):
                 for student_id in self.grades_dict[section_id].keys():
                     for submission_data in self.grades_dict[section_id][student_id]:
-                        if submission_data['learning_outcome'] == lo_name:
+                        if submission_data['learning_outcome'] == lo_name and submission_data['score'] is not None:
                             lo_scores_counts[lo_index][section_index] += 1
 
 
@@ -1675,7 +1675,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
-        self.figures.append("V2.1.2")
+        self.figures.append("V2.1.3")
         self.create_html()
 
 def create_report(anonymize, target_scorecount, is_group_assignment):
