@@ -1460,7 +1460,7 @@ class GradingDashboard:
             
         # Change the bar mode to stack
         fig.update_layout(
-            title=f'<b>Score distribution per LO</b><br>Stacked barplots.',
+            title=f'<b>Score distribution per LO</b><br>Stacked barplots. All sections aggregated.',
             xaxis_title='Learning Outcome',
             yaxis_title='Percentage',
             height=800,
@@ -1653,6 +1653,7 @@ class GradingDashboard:
         
         self.figures.append("<center><h1>LO score distributions</h1></center>")
         self.figures.append('''<details><summary>Stacked barplot, per LO  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('Each bar contains all scores given in that LO, across all sections.')
         self.figures.append('<div class= "vertical"><div class= "spaced">')
         try: self.LO_stackedbar_plot_all()
         except Exception as error_message: 
@@ -1661,6 +1662,7 @@ class GradingDashboard:
         self.figures.append('''  </div></div></p> </details>''')
 
         self.figures.append('''<br><details><summary>Stacked barplot, per section  <span class="icon">👈</span></summary><p>''')
+        self.figures.append('Each bar contains all scores given by that section, for the specific LO of the plot.')
         self.figures.append('<div class= "vertical"><div class= "spaced">')
         for lo_name in self.sorted_LOs:
             try: self.LO_stackedbar_plot(lo_name)
@@ -1673,7 +1675,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
-        self.figures.append("V2.1.1")
+        self.figures.append("V2.1.2")
         self.create_html()
 
 def create_report(anonymize, target_scorecount, is_group_assignment):
