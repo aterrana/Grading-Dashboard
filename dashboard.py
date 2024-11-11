@@ -1571,7 +1571,7 @@ class GradingDashboard:
             for section_id in self.section_ids:
                 for student_id in self.grades_dict[section_id]:
                     for submission_data in self.grades_dict[section_id][student_id]:
-                        if submission_data['learning_outcome'] == lo_name:
+                        if submission_data['learning_outcome'] == lo_name and submission_data['score'] is not None:
                             score_count += 1
             lo_score_counts.append(score_count)
 
