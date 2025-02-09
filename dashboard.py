@@ -1543,7 +1543,7 @@ class GradingDashboard:
                 }
             </style>
         </head>
-        <body>
+        <body onload="document.querySelectorAll('details').forEach(detail => detail.setAttribute('open', true));">
         '''
 
         html_end = "</body>"
@@ -1675,7 +1675,7 @@ class GradingDashboard:
             try: self.section_id_table()
             except Exception as error_message: print(f"Failed to create section id table\n {error_message=}")
         self.figures.append("<br><center><i>The report code and instructions can be found <a href='https://github.com/g-nilsson/Grading-Dashboard'>here</a>, written by <a href='mailto:gabriel.nilsson@uni.minerva.edu'>gabriel.nilsson@uni.minerva.edu</a>, reach out for questions</i></center>")
-        self.figures.append("V2.1.3")
+        self.figures.append("V2.1.4")
         self.create_html()
 
 def create_report(anonymize, target_scorecount, is_group_assignment):
@@ -1690,7 +1690,7 @@ def create_report(anonymize, target_scorecount, is_group_assignment):
     #os.system("open grading_dashboard.html")
     #os.system("open " f"{dir_path.as_posix()}/grading_dashboard.html")
     try:
-        os.startfile(f'{dir_path}\grading_dashboard.html')
+        os.startfile(f'{dir_path}\\grading_dashboard.html')
     except:
         try:
             file_path = f"{dir_path.as_posix()}/grading_dashboard.html"
@@ -1698,7 +1698,7 @@ def create_report(anonymize, target_scorecount, is_group_assignment):
             os.system(f'open "{file_path}"')
         except:
             print("Was unable to open the grading dashboard html, the html can be found at:")
-            print(f'{dir_path}\grading_dashboard.html')
+            print(f'{dir_path}\\grading_dashboard.html')
 
     # Clearing the grade_data file to not accidentally publish any grading data to the github repo
     with open("grade_data.py", 'w', encoding="utf-8") as file:
