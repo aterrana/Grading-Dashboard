@@ -563,11 +563,17 @@ class GradingDashboard:
         else:
             # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
             mean_color_indices = []
+            # Prepare bounds for clamping based on available red/blue colorscale length
+            rb_len = len(redblue_colorscale)
             for mean_val in self.section_means:
-                if np.isnan(mean_val):
-                    mean_color_indices.append(50)
-                else:
-                    mean_color_indices.append(int(25*(mean_val-1)))
+                    if np.isnan(mean_val):
+                        mean_color_indices.append(50)
+                    else:
+                        # Map mean score from new rubric 0..5 to index space similar to previous behavior.
+                        mapped = int(25 * (mean_val))
+                        # Clamp to valid index range
+                        mapped = max(0, min(rb_len-1, mapped))
+                        mean_color_indices.append(mapped)
         # If all SDs are equal
         if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
             # Set all colors to the middle point
@@ -1377,33 +1383,35 @@ class GradingDashboard:
         LO_scores_count = []
 
         for section_id in self.section_ids:
-            # Add 5 counters for the 5 possible scores
-            LO_scores_count.append(np.zeros(5))
+            # Add 6 counters for the 6 possible scores (0-5)
+            LO_scores_count.append(np.zeros(6))
             for student_id in self.grades_dict[section_id]:
                 for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
                         try:
-                            LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                            # New rubric includes 0; map score value directly to index (0->0, 5->5)
+                            LO_scores_count[-1][int(submission_data['score'])] += 1
                         except:
                             ...
         
-        LO_scores_perc = [np.zeros(5) for _ in range(len(self.section_ids))]
+        LO_scores_perc = [np.zeros(6) for _ in range(len(self.section_ids))]
         # If there are any scores, convert counts to percentages [0-1]
         for i, section in enumerate(LO_scores_count):
             if sum(section) > 0:
                 LO_scores_perc[i] = np.array(section)/sum(section)
 
-        # The official minerva grade colors, from left to right, 1 to 5
-        colors = ['rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+        # The official minerva grade colors, from left to right, now 0 to 5.
+        # 0 (new) is dark grey. 1-5 keep previous colors in same relative order.
+        colors = ['rgba(80,80,80,1)', 'rgba(223,47,38,1)', 'rgba(240,135,30,1)', 'rgba(51,171,111,1)', 'rgba(10,120,191,1)', 'rgba(91,62,151,1)']
         fig = go.Figure()
-        for score in range(1, 6):
-            score_fractions = [section_scores[score-1] for section_scores in LO_scores_perc]
+        for score in range(0, 6):
+            score_fractions = [section_scores[score] for section_scores in LO_scores_perc]
             fig.add_trace(go.Bar(name=score, 
                                  x=self.section_names, 
                                  y=score_fractions, 
-                                 marker=dict(color=colors[score-1]),
-                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
+                                 marker=dict(color=colors[score]),
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score])) for i, val in enumerate(score_fractions)],
                                  textposition='inside'))
             
         # Change the bar mode to stack
@@ -1426,8 +1434,8 @@ class GradingDashboard:
         LO_scores_count = []
 
         for LO_name in self.sorted_LOs:
-            # Add 5 counters for the 5 possible scores
-            LO_scores_count.append(np.zeros(5))
+            # Add 6 counters for the 6 possible scores (0-5)
+            LO_scores_count.append(np.zeros(6))
             # For each grade of all students
             for section_id in self.section_ids:
                 for student_id in self.grades_dict[section_id]:
@@ -1436,26 +1444,26 @@ class GradingDashboard:
                         if submission_data['learning_outcome'] == LO_name:
                             # Increment the the counter corresponding to the score
                             try:
-                                LO_scores_count[-1][int(submission_data['score'])-1] += 1
+                                LO_scores_count[-1][int(submission_data['score'])] += 1
                             except:
                                 ...
             
-        LO_scores_perc = [np.zeros(5) for _ in range(len(self.all_LOs))]
+        LO_scores_perc = [np.zeros(6) for _ in range(len(self.all_LOs))]
         # If there are any scores, convert counts to percentages [0-1]
         for i, this_lo_dist in enumerate(LO_scores_count):
             if sum(this_lo_dist) > 0:
                 LO_scores_perc[i] = np.array(this_lo_dist)/sum(this_lo_dist)
 
-        # The official minerva grade colors, from left to right, 1 to 5
-        colors = ['rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+        # The official minerva grade colors, from left to right, now 0 to 5.
+        colors = ['rgba(80,80,80,1)', 'rgba(223,47,38,1)', 'rgba(240,135,30,1)', 'rgba(51,171,111,1)', 'rgba(10,120,191,1)', 'rgba(91,62,151,1)']
         fig = go.Figure()
-        for score in range(1, 6):
-            score_fractions = [section_scores[score-1] for section_scores in LO_scores_perc]
+        for score in range(0, 6):
+            score_fractions = [section_scores[score] for section_scores in LO_scores_perc]
             fig.add_trace(go.Bar(name=score,
                                  x=list(self.sorted_LOs), 
                                  y=score_fractions, 
-                                 marker=dict(color=colors[score-1]),
-                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score-1])) for i, val in enumerate(score_fractions)],
+                                 marker=dict(color=colors[score]),
+                                 text=[str(round(val*100, 1)) + '%<br>' + str(int(LO_scores_count[i][score])) for i, val in enumerate(score_fractions)],
                                  textposition='inside'))
             
         # Change the bar mode to stack
