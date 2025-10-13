@@ -7,7 +7,7 @@ This project is an assignment grading dashboard for course leads, so that they c
 1. [Download](https://chromewebstore.google.com/detail/minerva-assignment-data-g/afmncekkkklpkommcpkgiielaoahiiin) the "Minerva Assignment Data-grabber" chrome extension.
 2. [Download](https://github.com/aterrana/Grading-Dashboard/archive/refs/heads/main.zip) this project, remember the path to the folder after you've unzipped it.
 3. If you haven't already, [install python](https://www.python.org/downloads/)
-4. Install the python libraries: plotly, and requests-futures, by pasting the following commands in your command prompt `<br>`
+4. Install the python libraries: plotly, and requests-futures, by pasting the following commands in your command prompt <br>
 
 ```
 pip install pandas
@@ -27,7 +27,7 @@ pip3 install scipy
 
 # How to use
 
-1. (Optional) Pin the chrome extension`<br>`
+1. (Optional) Pin the chrome extension<br>
 
 <p align="center">
 <img src="https://github.com/g-nilsson/public_files/blob/main/pin_extension.gif" width="280" />
