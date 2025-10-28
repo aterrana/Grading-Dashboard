@@ -1,11 +1,12 @@
-'''
+"""
 Retrieve the scores and written comments for all assignment submissions in all
 sections of a course given a Forum assignment id.
 
 You can get the Forum id of an assignment by visiting a section page on Forum
 and clicking on the title of an assignment. This will take you to a URL of the
 form https://forum.minerva.edu/app/assignments/123456 where 123456 is the id.
-'''
+"""
+
 import io
 import sys
 import json
@@ -25,11 +26,13 @@ try:
 except:
     cookie_cred = None
 if cookie_cred is None:
-    sys.stderr.write(f'''
+    sys.stderr.write(
+        f"""
 Usage: {sys.argv[0]} cookie_cred assignment_id
 
 Must include a cookie credential string
-''')
+"""
+    )
     sys.exit(-1)
 
 # Provide the assignment id as an input argument
@@ -38,17 +41,19 @@ try:
 except:
     assignment_id = None
 if assignment_id is None:
-    sys.stderr.write(f'''
+    sys.stderr.write(
+        f"""
 Usage: {sys.argv[0]} cookie_cred assignment_id
 
 Retrieve the scores and written comments for all assignment submissions in all sections of a course given a Forum assignment id.
 
 The assignment_id argument must be an integer.
-''')
+"""
+    )
     sys.exit(-1)
 
 
-http_headers = credentials.get_http_headers('forum.minerva.edu', cookie_cred)
+http_headers = credentials.get_http_headers("forum.minerva.edu", cookie_cred)
 requests_session = FuturesSession()
 
 
@@ -81,80 +86,105 @@ def get_futures_with_retry(urls, http_headers, retries=2):
         for i, output in zip(retry_index, retry_outputs):
             outputs[i] = output
     elif len(retry_index) > 0:
-        print('ERROR: Failed GETs:', file=sys.stderr)
+        print("ERROR: Failed GETs:", file=sys.stderr)
         for i in retry_index:
-            print(' -', outputs[i].request_response.request.url, '->', outputs[i].request_response.status_code, file=sys.stderr)
+            print(
+                " -",
+                outputs[i].request_response.request.url,
+                "->",
+                outputs[i].request_response.status_code,
+                file=sys.stderr,
+            )
 
     return outputs
 
 
 # Step 1: Get section id for the given assignment id
-print('Looking up course for assignment id', assignment_id)
+print("Looking up course for assignment id", assignment_id)
 response = requests.get(
-    f'https://forum.minerva.edu/api/v1/assignments/{assignment_id}/nested_for_detail_page',
-    headers=http_headers)
+    f"https://forum.minerva.edu/api/v1/assignments/{assignment_id}/nested_for_detail_page",
+    headers=http_headers,
+)
 assignment = response.json()
-section_id = assignment['section-id']
+section_id = assignment["section-id"]
 
 # In Forum, the same assignment will have different Forum ids in different
 # sections of the same course. This Course Builder id is unique for the same
 # assignment across all sections of a course.
-course_builder_id = assignment['num']
+course_builder_id = assignment["num"]
 
 # Step 2: Get course id for the section id
 response = requests.get(
-    f'https://forum.minerva.edu/api/v1/sections/{section_id}',
-    headers=http_headers)
+    f"https://forum.minerva.edu/api/v1/sections/{section_id}", headers=http_headers
+)
 section = response.json()
-course_id = section['course-id']
+course_id = section["course-id"]
 
 # Step 3: Get learning outcomes for the course
 response = requests.get(
-    f'https://forum.minerva.edu/api/v1/courses/{course_id}/trees',
-    headers=http_headers)
+    f"https://forum.minerva.edu/api/v1/courses/{course_id}/trees", headers=http_headers
+)
 hc_and_lo_trees = response.json()
 los = {
-    x['id']: x['hashtag']
-    for los in hc_and_lo_trees['lo-tree']['course-objectives']
-    for x in los['learning-outcomes']}
+    x["id"]: x["hashtag"]
+    for los in hc_and_lo_trees["lo-tree"]["course-objectives"]
+    for x in los["learning-outcomes"]
+}
 
 # Step 4: Get all sections for the course id
 response = requests.get(
-    f'https://forum.minerva.edu/api/v1/sections?course-id={course_id}&all-possible=true&registrar-dashboard=true&state=all&hide-defaults=true',
-    headers=http_headers)
+    f"https://forum.minerva.edu/api/v1/sections?course-id={course_id}&all-possible=true&registrar-dashboard=true&state=all&hide-defaults=true",
+    headers=http_headers,
+)
 sections = response.json()
-course_code = sections[0]['course']['course-code']
+course_code = sections[0]["course"]["course-code"]
 sections = {
-    s['id']: {'title': s['title'], 'student_count': s['student-count']}
-    for s in sections}
-print(f'Found course {course_id}. {course_code} with section ids {list(sections.keys())}')
+    s["id"]: {"title": s["title"], "student_count": s["student-count"]}
+    for s in sections
+}
+print(
+    f"Found course {course_id}. {course_code} with section ids {list(sections.keys())}"
+)
 
 # Step 5: Get all assignments for all sections of the course
-all_assignments = dict(zip(sections.keys(), get_futures_with_retry(
-    [
-        f'https://forum.minerva.edu/api/v1/paginated-assignments?filter_section_id={section_id}&category=iterative&category=signature&category=final&category=location-based&include_description=false&grader_list=true&show_unmuted=true&title_matches=&page_size=100'
-        for section_id in sections.keys()],
-    http_headers)))
+all_assignments = dict(
+    zip(
+        sections.keys(),
+        get_futures_with_retry(
+            [
+                f"https://forum.minerva.edu/api/v1/paginated-assignments?filter_section_id={section_id}&category=iterative&category=signature&category=final&category=location-based&include_description=false&grader_list=true&show_unmuted=true&title_matches=&page_size=100"
+                for section_id in sections.keys()
+            ],
+            http_headers,
+        ),
+    )
+)
 
 # In each section, find the Forum assignment id matching `course_builder_id`
-assignment_title = ''
+assignment_title = ""
 for section_id in sections.keys():
     result = all_assignments[section_id]
     all_assignments[section_id] = None
-    #print("result['results']", result['results'])
-    for assignment in result['results']:
-        if assignment['num'] == course_builder_id:
-            all_assignments[section_id] = assignment['id']
-            assignment_title = assignment['title']
+    # print("result['results']", result['results'])
+    for assignment in result["results"]:
+        if assignment["num"] == course_builder_id:
+            all_assignments[section_id] = assignment["id"]
+            assignment_title = assignment["title"]
 
 # Step 6: Fetch the grading data for the assignment in each section
-all_assignments = dict(zip(
-    sections.keys(),
-    get_futures_with_retry(
-        [
-            f'https://forum.minerva.edu/api/v1/assignments/{all_assignments[section_id]}/nested_for_grader'
-            for section_id in sections.keys()],
-        http_headers)))
+# Note: We fetch all data first, then filter after user input
+all_assignments = dict(
+    zip(
+        sections.keys(),
+        get_futures_with_retry(
+            [
+                f"https://forum.minerva.edu/api/v1/assignments/{all_assignments[section_id]}/nested_for_grader"
+                for section_id in sections.keys()
+            ],
+            http_headers,
+        ),
+    )
+)
 
 grades = defaultdict(lambda: defaultdict(list))
 grades = {}
@@ -162,48 +192,57 @@ is_group_assignment = False
 for section_id in sections.keys():
     assignment = all_assignments[section_id]
     # Get scores and comments, grouped by student
-    for assessment in assignment['outcome-assessments']:
-        if assessment['active']:  # As far as I know, deleted scores/comments are marked as inactive
-            student_id = assessment['target-user-id']
+    for assessment in assignment["outcome-assessments"]:
+        if assessment[
+            "active"
+        ]:  # As far as I know, deleted scores/comments are marked as inactive
+            student_id = assessment["target-user-id"]
             if student_id is None:
-                student_id = assessment['target-assignment-group-id']
+                student_id = assessment["target-assignment-group-id"]
                 if student_id is not None:
                     is_group_assignment = True
-            
+
             if section_id not in grades.keys():
                 grades[section_id] = {}
             if student_id is not None:
                 if student_id not in grades[section_id].keys():
                     grades[section_id][student_id] = []
 
+            grades[section_id][student_id].append(
+                {
+                    "learning_outcome": los.get(
+                        assessment["learning-outcome"], assessment["learning-outcome"]
+                    ),
+                    "score": assessment["score"],
+                    "comment": assessment["comment"],
+                    "graded_blindly": assessment["graded-blindly"],
+                    "created_on": assessment["created-on"],
+                    "updated_on": assessment["updated-on"],
+                }
+            )
 
-            grades[section_id][student_id].append({
-                'learning_outcome': los.get(assessment['learning-outcome'], assessment['learning-outcome']),
-                'score': assessment['score'],
-                'comment': assessment['comment'],
-                'graded_blindly': assessment['graded-blindly'],
-                'created_on': assessment['created-on'],
-                'updated_on': assessment['updated-on']})
+# Temporarily store the data without filtering
+temp_output = {
+    "course": {"id": course_id, "code": course_code},
+    "assignment_title": assignment_title,
+    "sections": sections,  # {section_id: {'title': TTh name (11am), 'student_count': ...}}
+    "grades": grades,
+}  # {section_id: {student_id: grade_data}}
 
-output = {
-    'course': {
-        'id': course_id,
-        'code': course_code},
-    'assignment_title': assignment_title,
-    'sections': sections,  # {section_id: {'title': TTh name (11am), 'student_count': ...}}
-    'grades': grades}  # {section_id: {student_id: grade_data}}
-
-# Store the dictionary in a file
-with open("grade_data.py", 'w', encoding="utf-8") as file:
-    file.write(str(output))
 print("Grade data collected")
 
 while True:
-    anon_ans_str = input('\n    Do you want the sections to have anonymized names in the report? "Section A" instead of "Lastname, MW@11:00AM City" (Y/N)\n    ').upper().strip()
-    if anon_ans_str == 'Y' or anon_ans_str == 'YES':
+    anon_ans_str = (
+        input(
+            '\n    Do you want the sections to have anonymized names in the report? "Section A" instead of "Lastname, MW@11:00AM City" (Y/N)\n    '
+        )
+        .upper()
+        .strip()
+    )
+    if anon_ans_str == "Y" or anon_ans_str == "YES":
         anon_answer = True
         break
-    elif anon_ans_str == 'N' or anon_ans_str == 'NO':
+    elif anon_ans_str == "N" or anon_ans_str == "NO":
         anon_answer = False
         break
     else:
@@ -212,7 +251,9 @@ while True:
 print()
 
 while True:
-    target_score_ans_str = input('    What is the target number of scores for each student, for this assignment?\n    ').strip()
+    target_score_ans_str = input(
+        "    What is the target number of scores for each student, for this assignment?\n    "
+    ).strip()
     try:
         target_score = int(target_score_ans_str)
         assert target_score > 0
@@ -222,9 +263,73 @@ while True:
 
 print()
 
-dashboard.create_report(anon_answer, target_score, is_group_assignment)
+while True:
+    include_zero_ans_str = (
+        input("    Do you want to include zero scores in the calculations? (Y/N)\n    ")
+        .upper()
+        .strip()
+    )
+    if include_zero_ans_str == "Y" or include_zero_ans_str == "YES":
+        include_zero_scores = True
+        break
+    elif include_zero_ans_str == "N" or include_zero_ans_str == "NO":
+        include_zero_scores = False
+        break
+    else:
+        print("Please input either 'y'/'yes' for yes, or 'n'/'no' for no\n")
 
-'''
+print()
+
+# Filter out zero scores if user chose not to include them
+filtered_grades = copy.deepcopy(grades)
+if not include_zero_scores:
+    print("Filtering out zero scores from calculations...")
+    zero_count = 0
+    students_removed = 0
+
+    for section_id in list(filtered_grades.keys()):
+        students_to_remove = []
+
+        for student_id in filtered_grades[section_id].keys():
+            original_len = len(filtered_grades[section_id][student_id])
+            filtered_grades[section_id][student_id] = [
+                grade_entry
+                for grade_entry in filtered_grades[section_id][student_id]
+                if grade_entry["score"] != 0
+            ]
+            zero_count += original_len - len(filtered_grades[section_id][student_id])
+
+            # Mark students with no scores left for removal
+            if len(filtered_grades[section_id][student_id]) == 0:
+                students_to_remove.append(student_id)
+
+        # Remove students with no scores left
+        for student_id in students_to_remove:
+            del filtered_grades[section_id][student_id]
+            students_removed += 1
+
+    print(f"Excluded {zero_count} zero scores from calculations")
+    if students_removed > 0:
+        print(f"Removed {students_removed} student(s) who had only zero scores")
+
+# Create final output with filtered grades and include_zero_scores flag
+output = {
+    "course": {"id": course_id, "code": course_code},
+    "assignment_title": assignment_title,
+    "sections": sections,
+    "grades": filtered_grades,
+    "include_zero_scores": include_zero_scores,
+}
+
+# Store the dictionary in a file
+with open("grade_data.py", "w", encoding="utf-8") as file:
+    file.write(str(output))
+
+dashboard.create_report(
+    anon_answer, target_score, is_group_assignment, include_zero_scores
+)
+
+"""
 # Step 7 (optional): Anonymize the data
 fake_section_ids = defaultdict(lambda: random.randint(10000000, 20000000))
 fake_student_ids = defaultdict(lambda: random.randint(10000000, 20000000))
@@ -240,4 +345,4 @@ for section_id, section_grades in grades.items():
 with open(f'fake_data_{assignment_id}', 'wt') as fp:
     fp.write(str(dict(fake_data)))
     fp.write('\n')
-'''
+"""
