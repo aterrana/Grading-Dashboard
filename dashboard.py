@@ -563,11 +563,17 @@ class GradingDashboard:
         else:
             # Let means vary linearly from 0.15 to 0.85 on redblue colorscale
             mean_color_indices = []
+            # Prepare bounds for clamping based on available red/blue colorscale length
+            rb_len = len(redblue_colorscale)
             for mean_val in self.section_means:
-                if np.isnan(mean_val):
-                    mean_color_indices.append(50)
-                else:
-                    mean_color_indices.append(int(25*(mean_val)))
+                    if np.isnan(mean_val):
+                        mean_color_indices.append(50)
+                    else:
+                        # Map mean score from new rubric 0..5 to index space similar to previous behavior.
+                        mapped = int(25 * (mean_val))
+                        # Clamp to valid index range
+                        mapped = max(0, min(rb_len-1, mapped))
+                        mean_color_indices.append(mapped)
         # If all SDs are equal
         if max(self.section_SDs)-min(self.section_SDs) == 0 or np.isnan(max(self.section_SDs)) or np.isnan(min(self.section_SDs)):
             # Set all colors to the middle point
@@ -1377,13 +1383,14 @@ class GradingDashboard:
         LO_scores_count = []
 
         for section_id in self.section_ids:
-            # Add 6 counters for the 6 possible scores
+            # Add 6 counters for the 6 possible scores (0-5)
             LO_scores_count.append(np.zeros(6))
             for student_id in self.grades_dict[section_id]:
                 for submission_data in self.grades_dict[section_id][student_id]:
                     if submission_data['learning_outcome'] == LO_name:
                         # Increment the the counter corresponding to the score
                         try:
+                            # New rubric includes 0; map score value directly to index (0->0, 5->5)
                             LO_scores_count[-1][int(submission_data['score'])] += 1
                         except:
                             ...
@@ -1394,8 +1401,10 @@ class GradingDashboard:
             if sum(section) > 0:
                 LO_scores_perc[i] = np.array(section)/sum(section)
 
-        # The official minerva grade colors, from left to right, 1 to 5
-        colors = ['rgba(150,150,150,255)', 'rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+
+        # The official minerva grade colors, from left to right, now 0 to 5.
+        # 0 (new) is dark grey. 1-5 keep previous colors in same relative order.
+        colors = ['rgba(80,80,80,1)', 'rgba(223,47,38,1)', 'rgba(240,135,30,1)', 'rgba(51,171,111,1)', 'rgba(10,120,191,1)', 'rgba(91,62,151,1)']
         fig = go.Figure()
         for score in range(0, 6):
             score_fractions = [section_scores[score] for section_scores in LO_scores_perc]
@@ -1426,7 +1435,8 @@ class GradingDashboard:
         LO_scores_count = []
 
         for LO_name in self.sorted_LOs:
-            # Add 6 counters for the 6 possible scores
+            
+            # Add 6 counters for the 6 possible scores (0-5)
             LO_scores_count.append(np.zeros(6))
             # For each grade of all students
             for section_id in self.section_ids:
@@ -1446,8 +1456,8 @@ class GradingDashboard:
             if sum(this_lo_dist) > 0:
                 LO_scores_perc[i] = np.array(this_lo_dist)/sum(this_lo_dist)
 
-        # The official minerva grade colors, from left to right, 1 to 5
-        colors = ['rgba(150,150,150,255)', 'rgba(223,47,38,255)', 'rgba(240,135,30,255)', 'rgba(51,171,111,255)', 'rgba(10,120,191,255)', 'rgba(91,62,151,255)']
+        # The official minerva grade colors, from left to right, now 0 to 5.
+        colors = ['rgba(80,80,80,1)', 'rgba(223,47,38,1)', 'rgba(240,135,30,1)', 'rgba(51,171,111,1)', 'rgba(10,120,191,1)', 'rgba(91,62,151,1)']
         fig = go.Figure()
         for score in range(0, 6):
             score_fractions = [section_scores[score] for section_scores in LO_scores_perc]
