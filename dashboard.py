@@ -21,7 +21,7 @@ class GradingDashboard:
     A grade_data file contains information about a single assignment across all current sections
     of that course.
 
-    1. Create an instance of the class, 
+    1. Create an instance of the class,
     2. Run all methods corresponding to the graphs and components you want in the report (in the order you want them to appear)
     3. Run create_html to create the .html file of the report
     """
@@ -136,12 +136,14 @@ class GradingDashboard:
         anonymize: bool = False,
         target_scorecount: int = None,
         is_group_assignment: bool = False,
+        include_zero_scores: bool = True,
     ) -> None:
         """
         Sets up global lists and dictionaries
         """
         self.anonymize = anonymize
         self.is_group_assignment = is_group_assignment
+        self.include_zero_scores = include_zero_scores
 
         # Read in data
 
@@ -157,6 +159,10 @@ class GradingDashboard:
         else:
             # Make it robust to errors here
             ...
+
+        # Read include_zero_scores from data file if available
+        if "include_zero_scores" in self.dict_all:
+            self.include_zero_scores = self.dict_all["include_zero_scores"]
 
         grades_dict = self.dict_all["grades"]
 
@@ -2294,6 +2300,9 @@ class GradingDashboard:
         self.figures.append(
             f"<center><i>Identified as a{' group' if self.is_group_assignment else 'n individual'} assignment</i></center>"
         )
+        self.figures.append(
+            f"<center><i>Zero scores are <b>{'INCLUDED' if self.include_zero_scores else 'EXCLUDED'}</b> in all calculations</i></center>"
+        )
         self.figures.append("<center><h1>Grading Progress</h1></center>")
         self.figures.append(
             """<details><summary>Summary progress table  <span class="icon">👈</span></summary><p>"""
@@ -2438,13 +2447,16 @@ class GradingDashboard:
         self.create_html()
 
 
-def create_report(anonymize, target_scorecount, is_group_assignment):
+def create_report(
+    anonymize, target_scorecount, is_group_assignment, include_zero_scores
+):
     print("Creating report")
     gd = GradingDashboard(
         "grade_data.py",
         anonymize=anonymize,
         target_scorecount=target_scorecount,
         is_group_assignment=is_group_assignment,
+        include_zero_scores=include_zero_scores,
     )
     gd.make_full_report()
 
